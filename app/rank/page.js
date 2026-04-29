@@ -5,8 +5,9 @@ import KeywordInput from '../../components/KeywordInput';
 
 /* ── 채널 정의 ─────────────────────────────────────────── */
 const PAID_CHANNELS = [
-  { key: 'powerlink',    label: '파워링크',   icon: '📢', color: '#e84118', isPaid: true  },
-  { key: 'powerContent', label: '파워콘텐츠', icon: '✍️', color: '#8e44ad', isPaid: true  },
+  { key: 'powerlink',    label: '파워링크',    icon: '📢', color: '#e84118', isPaid: true },
+  { key: 'powerContent', label: '파워콘텐츠',  icon: '✍️', color: '#8e44ad', isPaid: true },
+  { key: 'brandContent', label: '브랜드콘텐츠', icon: '🏷️', color: '#0070c9', isPaid: true },
 ];
 const ORGANIC_CHANNELS = [
   { key: 'blog', label: '블로그',  icon: '📝', color: 'var(--color-blog)' },
@@ -93,7 +94,7 @@ export default function RankPage() {
     <div>
       <div className="page-header">
         <h1 className="page-title">노출 순위 확인</h1>
-        <p className="page-desc">파워링크·파워콘텐츠·블로그·카페·뉴스·웹사이트 노출 순위를 PC/모바일 구분해서 확인합니다.</p>
+        <p className="page-desc">파워링크·파워콘텐츠·브랜드콘텐츠·블로그·카페·뉴스·웹사이트 노출 순위를 PC/모바일 구분해서 확인합니다.</p>
       </div>
 
       {/* 입력 패널 */}
@@ -273,6 +274,13 @@ export default function RankPage() {
                               </span>
                             )}
                           </div>
+                          {ch.key === 'blog' && (
+                            <div style={{ marginTop:4, fontSize:10, color:'var(--color-text-sub)' }}>
+                              {d?.source === 'serp'
+                                ? '🔎 통합검색 SERP 순위'
+                                : '📊 검색API 순위 (참고용)'}
+                            </div>
+                          )}
                           {d?.rank && d?.item?.title && (
                             <div style={{ marginTop:8, fontSize:11, color:'var(--color-text-sub)',
                               overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}
@@ -345,7 +353,9 @@ export default function RankPage() {
                               <td colSpan={2} style={{ padding:'10px 12px', borderBottom:'1px solid var(--color-border)' }}>
                                 <RankBadge rank={r[ch.key].rank} size="sm" />
                                 <span style={{ fontSize:11, color:'var(--color-text-sub)', marginLeft:6 }}>
-                                  (기기 공통)
+                                  {ch.key === 'blog'
+                                    ? (r[ch.key].source === 'serp' ? '🔎 SERP 순위' : '📊 API 순위')
+                                    : '(기기 공통)'}
                                 </span>
                               </td>
                               <td style={{ padding:'10px 12px', borderBottom:'1px solid var(--color-border)', maxWidth:280 }}>
