@@ -1,6 +1,6 @@
 /**
  * GET /api/debug-ad
- * 시그니처 4가지 조합 전부 테스트 — 어느 방식이 맞는지 확인용
+ * 쿼리 없이 /keywordstool 호출 → 400이 나오면 그 서명방식이 올바른 것
  */
 import { NextResponse } from 'next/server';
 import crypto from 'crypto';
@@ -9,7 +9,7 @@ export const runtime = 'nodejs';
 
 const BASE_URL = 'https://api.naver.com';
 
-async function trySignature({ label, timestamp, sigKey, uriForSig, fetchUri, customerId, accessLicense }) {
+async function tryAuth({ label, timestamp, sigKey, uriForSig, fetchUri, customerId, accessLicense }) {
   const message = `${timestamp}\nGET\n${uriForSig}`;
   const hmac = crypto.createHmac('sha256', sigKey);
   hmac.update(message);
@@ -27,18 +27,20 @@ async function trySignature({ label, timestamp, sigKey, uriForSig, fetchUri, cus
     const res = await fetch(`${BASE_URL}${fetchUri}`, { headers });
     const text = await res.text();
     let parsed;
-    try { parsed = JSON.parse(text); } catch { parsed = text.slice(0, 300); }
+    try { parsed = JSON.parse(text); } catch { parsed = text.slice(0, 400); }
     return {
       label,
-      uriForSig,
-      keyType: Buffer.isBuffer(sigKey) ? `Buffer(${sigKey.length}bytes)` : `string(${sigKey.length}chars)`,
-      signature,
       httpStatus: res.status,
-      ok: res.status === 200,
+      // 400 = 서명은 맞지만 파라미터 오류 → 올바른 서명!
+      // 403 = 서명 자체가 틀림
+      verdict: res.status === 200 ? '✅ 성공!'
+             : res.status === 400 ? '✅ 서명 OK (파라미터 오류)'
+             : res.status === 403 ? '❌ 서명 오류'
+             : `⚠️ HTTP ${res.status}`,
       response: parsed,
     };
   } catch (e) {
-    return { label, uriForSig, ok: false, networkError: e.message };
+    return { label, verdict: '❌ 네트워크 오류', error: e.message };
   }
 }
 
@@ -48,35 +50,46 @@ export async function GET() {
   const secretKey     = process.env.NAVER_AD_SECRET_KEY;
 
   const envCheck = {
-    NAVER_AD_CUSTOMER_ID:    customerId    ? `✅ (${customerId})` : '❌ 없음',
-    NAVER_AD_ACCESS_LICENSE: accessLicense ? `✅ (앞10: ${accessLicense.slice(0,10)}…)` : '❌ 없음',
-    NAVER_AD_SECRET_KEY:     secretKey     ? `✅ (앞10: ${secretKey.slice(0,10)}…, 길이:${secretKey.length})` : '❌ 없음',
+    NAVER_AD_CUSTOMER_ID:    customerId    ? `✅ "${customerId}" (len:${customerId.length})` : '❌',
+    NAVER_AD_ACCESS_LICENSE: accessLicense ? `✅ len:${accessLicense.length}, 앞20: ${accessLicense.slice(0,20)}` : '❌',
+    NAVER_AD_SECRET_KEY:     secretKey     ? `✅ len:${secretKey.length}, 앞20: ${secretKey.slice(0,20)}, 뒤5: ${secretKey.slice(-5)}` : '❌',
   };
 
   if (!customerId || !accessLicense || !secretKey) {
     return NextResponse.json({ envCheck, error: 'API 키 미설정' });
   }
 
-  const timestamp  = String(Date.now());
-  const stringKey  = secretKey.trim();
-  const b64Key     = Buffer.from(secretKey.trim(), 'base64');
-  const pathOnly   = '/keywordstool';
-  const fullUri    = `/keywordstool?hintKeywords=${encodeURIComponent('pc방창업')}&showDetail=1`;
+  const timestamp = String(Date.now());
+  const sk        = secretKey.trim();
+  const b64Key    = Buffer.from(sk, 'base64');
 
-  // 4가지 조합 동시 테스트
+  // 쿼리 없이 순수 path만 → 서명 OK면 400(required param missing), 서명 NG면 403
+  const noParamUri = '/keywordstool';
+
   const results = await Promise.all([
-    trySignature({ label: '① string키 + path만',     timestamp, sigKey: stringKey, uriForSig: pathOnly, fetchUri: fullUri, customerId, accessLicense }),
-    trySignature({ label: '② string키 + fullURI',    timestamp, sigKey: stringKey, uriForSig: fullUri,  fetchUri: fullUri, customerId, accessLicense }),
-    trySignature({ label: '③ Base64디코딩키 + path만', timestamp, sigKey: b64Key,    uriForSig: pathOnly, fetchUri: fullUri, customerId, accessLicense }),
-    trySignature({ label: '④ Base64디코딩키 + fullURI', timestamp, sigKey: b64Key,   uriForSig: fullUri,  fetchUri: fullUri, customerId, accessLicense }),
+    tryAuth({ label: '① string키',         timestamp, sigKey: sk,     uriForSig: noParamUri, fetchUri: noParamUri, customerId, accessLicense }),
+    tryAuth({ label: '② Base64디코딩키',    timestamp, sigKey: b64Key, uriForSig: noParamUri, fetchUri: noParamUri, customerId, accessLicense }),
+    // 혹시 X-Customer를 숫자로 보내야하는지도 테스트
+    tryAuth({ label: '③ string키 (X-Customer=number)', timestamp, sigKey: sk, uriForSig: noParamUri, fetchUri: noParamUri,
+      customerId: Number(customerId), accessLicense }),
   ]);
 
-  const winner = results.find(r => r.ok);
+  // 키워드 포함 버전도 string키로 시도
+  const withKw = await tryAuth({
+    label: '④ string키 + 키워드 URL',
+    timestamp, sigKey: sk,
+    uriForSig: noParamUri,
+    fetchUri: `/keywordstool?hintKeywords=${encodeURIComponent('pc방창업')}&showDetail=1`,
+    customerId, accessLicense,
+  });
+  results.push(withKw);
+
+  const winner = results.find(r => r.verdict.startsWith('✅'));
 
   return NextResponse.json({
     envCheck,
     timestamp,
-    winner: winner ? winner.label : '❌ 모두 실패',
+    winner: winner ? winner.label : '❌ 모두 실패 — API 키 자체 문제 가능성',
     results,
   });
 }
