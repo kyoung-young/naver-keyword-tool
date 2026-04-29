@@ -4,7 +4,7 @@ import { usePathname } from 'next/navigation';
 
 const PAGE_META = {
   '/':                   { title: '키워드 검색 분석',  desc: '네이버 블로그·카페·뉴스·웹문서 통합 검색' },
-  '/keyword-analysis':   { title: '키워드 분석',       desc: 'PC/모바일 검색량 · 블로그 발행량 조회' },
+  '/keyword-analysis':   { title: '키워드 분석',       desc: '검색량 · 등급 · 포화도 · 연관키워드 · 성별/연령' },
   '/keyword-expansion':  { title: '키워드 확장',       desc: '시드 키워드 기반 연관 키워드 발굴' },
   '/rank':               { title: '노출 순위 확인',    desc: '파워링크 · 파워콘텐츠 · 블로그 · 카페 등 순위 조회' },
   '/influence-ranking':  { title: '영향력 분석',       desc: '내 채널의 키워드별 노출 현황 및 점수 측정' },

@@ -2,113 +2,85 @@
 
 import { useState, useEffect } from 'react';
 
-/* ── 등급 설정 ──────────────────────────────────────────── */
+/* ══════════════════════════════════════════════
+   상수 / 헬퍼
+══════════════════════════════════════════════ */
 const GRADES = {
-  diamond:  { label: '다이아',   icon: '💎', color: '#0369a1', bg: '#e0f2fe' },
-  platinum: { label: '플래티넘', icon: '🔮', color: '#7c3aed', bg: '#f3e8ff' },
-  gold:     { label: '골드',     icon: '🥇', color: '#b45309', bg: '#fef3c7' },
-  silver:   { label: '실버',     icon: '🥈', color: '#475569', bg: '#f1f5f9' },
-  bronze:   { label: '브론즈',   icon: '🥉', color: '#9a3412', bg: '#ffedd5' },
-  seed:     { label: '씨앗',     icon: '🌱', color: '#166534', bg: '#dcfce7' },
+  diamond:  { label: '다이아',   icon: '💎', color: '#0369a1', bg: '#e0f2fe', range: '3만+' },
+  platinum: { label: '플래티넘', icon: '🔮', color: '#7c3aed', bg: '#f3e8ff', range: '1만~3만' },
+  gold:     { label: '골드',     icon: '🥇', color: '#b45309', bg: '#fef3c7', range: '3천~1만' },
+  silver:   { label: '실버',     icon: '🥈', color: '#475569', bg: '#f1f5f9', range: '1천~3천' },
+  bronze:   { label: '브론즈',   icon: '🥉', color: '#9a3412', bg: '#ffedd5', range: '300~1천' },
+  seed:     { label: '씨앗',     icon: '🌱', color: '#166534', bg: '#dcfce7', range: '~300' },
 };
-
-/* ── 포화도 설정 ─────────────────────────────────────────── */
-const SATURATIONS = {
-  ocean: { label: '블루오션', icon: '🌊', color: '#0369a1', bg: '#e0f2fe' },
-  low:   { label: '기회',    icon: '🟢', color: '#166534', bg: '#dcfce7' },
-  mid:   { label: '보통',    icon: '🟡', color: '#92400e', bg: '#fef3c7' },
-  high:  { label: '경쟁',    icon: '🟠', color: '#9a3412', bg: '#ffedd5' },
-  red:   { label: '레드오션',icon: '🔴', color: '#991b1b', bg: '#fee2e2' },
-};
-
-const COMP       = { low: '낮음', mid: '중간', high: '높음' };
-const COMP_COLOR = { low: '#166534', mid: '#92400e', high: '#991b1b' };
-const COMP_BG    = { low: '#dcfce7', mid: '#fef3c7', high: '#fee2e2' };
+const COMP_LABEL = { low: '낮음', mid: '중간', high: '높음' };
+const COMP_COLOR = { low: '#16a34a', mid: '#d97706', high: '#dc2626' };
+const COMP_BG    = { low: '#dcfce7', mid: '#fef9c3', high: '#fee2e2' };
 const AGE_COLORS = ['#6366f1','#06b6d4','#10b981','#f59e0b','#ef4444','#8b5cf6'];
 
-function fmtNum(n) {
+function fmtN(n) {
   if (n === null || n === undefined) return '-';
   if (n < 10) return '<10';
-  return n.toLocaleString();
+  return Number(n).toLocaleString();
+}
+function fmtPct(p) {
+  if (p === null || p === undefined) return '-';
+  return `${p}%`;
 }
 
-function calcGradeFromTotal(total) {
-  if (!total) return null;
-  if (total >= 30000) return 'diamond';
-  if (total >= 10000) return 'platinum';
-  if (total >= 3000)  return 'gold';
-  if (total >= 1000)  return 'silver';
-  if (total >= 300)   return 'bronze';
-  return 'seed';
-}
-
-/* ── 등급 뱃지 ──────────────────────────────────────────── */
-function GradeBadge({ grade }) {
+/* ── 등급 뱃지 ── */
+function GradeBadge({ grade, size = 'md' }) {
   if (!grade) return <span style={{ color: '#9ca3af', fontSize: 12 }}>-</span>;
   const g = GRADES[grade];
-  if (!g) return null;
+  const fs = size === 'lg' ? 13 : 11;
+  const px = size === 'lg' ? '4px 14px' : '2px 10px';
   return (
-    <span style={{
-      display: 'inline-flex', alignItems: 'center', gap: 4,
-      padding: '2px 10px', borderRadius: 20, fontSize: 11, fontWeight: 700,
-      background: g.bg, color: g.color,
-    }}>
+    <span style={{ display:'inline-flex', alignItems:'center', gap:4, padding:px, borderRadius:20, fontSize:fs, fontWeight:700, background:g.bg, color:g.color }}>
       {g.icon} {g.label}
     </span>
   );
 }
 
-/* ── 포화도 뱃지 ─────────────────────────────────────────── */
-function SatBadge({ saturation }) {
-  if (!saturation) return <span style={{ color: '#9ca3af', fontSize: 12 }}>-</span>;
-  const s = SATURATIONS[saturation];
-  if (!s) return null;
-  return (
-    <span style={{
-      display: 'inline-flex', alignItems: 'center', gap: 4,
-      padding: '2px 10px', borderRadius: 20, fontSize: 11, fontWeight: 700,
-      background: s.bg, color: s.color,
-    }}>
-      {s.icon} {s.label}
-    </span>
-  );
+/* ── 포화도 색상 ── */
+function satColor(pct) {
+  if (pct === null) return '#9ca3af';
+  if (pct < 10)  return '#2563eb';
+  if (pct < 30)  return '#16a34a';
+  if (pct < 50)  return '#d97706';
+  if (pct < 80)  return '#ea580c';
+  return '#dc2626';
+}
+function satLabel(pct) {
+  if (pct === null) return '-';
+  if (pct < 10)  return '매우 낮음';
+  if (pct < 30)  return '낮음';
+  if (pct < 50)  return '높음';
+  if (pct < 80)  return '매우 높음';
+  return '포화';
 }
 
-/* ── 가로 퍼센트 바 ─────────────────────────────────────── */
-function PercentBar({ label, percent, color }) {
-  return (
-    <div style={{ marginBottom: 8 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 4 }}>
-        <span style={{ color: 'var(--color-text-sub)' }}>{label}</span>
-        <span style={{ fontWeight: 700, color }}>{percent}%</span>
-      </div>
-      <div style={{ height: 8, borderRadius: 4, background: '#f3f4f6', overflow: 'hidden' }}>
-        <div style={{ height: '100%', borderRadius: 4, width: `${percent}%`, background: color, transition: 'width 0.5s ease' }} />
-      </div>
-    </div>
-  );
-}
-
-/* ── 트렌드 스파크라인 (SVG) ────────────────────────────── */
-function Sparkline({ data, color = '#03c75a' }) {
-  if (!data?.length) return <span style={{ fontSize: 11, color: '#9ca3af' }}>-</span>;
-  const W = 100, H = 30, PAD = 2;
-  const vals = data.map(d => d.ratio ?? 0);
-  const max  = Math.max(...vals, 1);
-  const points = vals.map((v, i) => {
-    const x = PAD + (i / Math.max(vals.length - 1, 1)) * (W - PAD * 2);
-    const y = PAD + (1 - v / max) * (H - PAD * 2);
+/* ── 스파크라인 SVG ── */
+function Sparkline({ data, color = '#03c75a', w = 120, h = 36 }) {
+  if (!data?.length) return null;
+  const vals  = data.map(d => d.ratio ?? 0);
+  const max   = Math.max(...vals, 1);
+  const PAD   = 3;
+  const pts   = vals.map((v, i) => {
+    const x = PAD + (i / Math.max(vals.length - 1, 1)) * (w - PAD * 2);
+    const y = PAD + (1 - v / max) * (h - PAD * 2);
     return `${x.toFixed(1)},${y.toFixed(1)}`;
   }).join(' ');
   return (
-    <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`}>
-      <polyline points={points} fill="none" stroke={color} strokeWidth={1.5}
+    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`}>
+      <polyline points={pts} fill="none" stroke={color} strokeWidth="2"
         strokeLinejoin="round" strokeLinecap="round" />
     </svg>
   );
 }
 
-/* ── 키워드 상세 패널 ────────────────────────────────────── */
+/* ══════════════════════════════════════════════
+   상세 패널 (연관키워드 / 트렌드 / 성향분석)
+══════════════════════════════════════════════ */
 function DetailPanel({ keyword }) {
   const [data, setData]       = useState(null);
   const [loading, setLoading] = useState(true);
@@ -124,180 +96,315 @@ function DetailPanel({ keyword }) {
       body: JSON.stringify({ keyword }),
     })
       .then(r => r.json().then(j => ({ ok: r.ok, j })))
-      .then(({ ok, j }) => {
-        if (cancelled) return;
-        if (!ok) throw new Error(j.error);
-        setData(j);
-      })
+      .then(({ ok, j }) => { if (!cancelled) { if (!ok) throw new Error(j.error); setData(j); } })
       .catch(e => { if (!cancelled) setError(e.message); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, [keyword]);
 
+  const TABS = [
+    { key: 'related', label: '🔗 연관 키워드' },
+    { key: 'trend',   label: '📈 트렌드' },
+    { key: 'demo',    label: '👥 성향 분석' },
+  ];
+
   return (
-    <div style={{ padding: '20px 24px', background: 'var(--color-bg-sub, #fafafa)', borderTop: '1px solid var(--color-border)' }}>
-      {/* 탭 + 트렌드 */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20, flexWrap: 'wrap' }}>
-        {[['related','🔗 연관 키워드'], ['demo','👥 성별·연령']].map(([k, l]) => (
-          <button key={k}
-            className={`btn ${tab === k ? 'btn-primary' : 'btn-ghost'}`}
-            style={{ padding: '5px 14px', fontSize: 12 }}
-            onClick={() => setTab(k)}>
-            {l}
+    <div style={{ borderTop: '2px solid var(--color-primary)', background: '#fafafa' }}>
+      {/* 탭 */}
+      <div style={{ display:'flex', gap:0, borderBottom:'1px solid var(--color-border)', background:'#fff' }}>
+        {TABS.map(t => (
+          <button key={t.key} onClick={() => setTab(t.key)}
+            style={{
+              padding:'10px 20px', fontSize:13, fontWeight: tab===t.key ? 700 : 500,
+              color: tab===t.key ? 'var(--color-primary)' : 'var(--color-text-sub)',
+              background:'transparent', border:'none', borderBottom: tab===t.key ? '2px solid var(--color-primary)' : '2px solid transparent',
+              cursor:'pointer', marginBottom:-1,
+            }}>
+            {t.label}
           </button>
         ))}
-        {data?.trendData?.length > 0 && (
-          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: 11, color: 'var(--color-text-sub)' }}>12개월 트렌드</span>
-            <Sparkline data={data.trendData} />
-          </div>
-        )}
       </div>
 
-      {/* 로딩 */}
-      {loading && (
-        <div style={{ textAlign: 'center', padding: '28px 0' }}>
-          <span className="spinner" style={{ width: 22, height: 22 }} />
-          <p style={{ marginTop: 10, color: 'var(--color-text-sub)', fontSize: 13 }}>
-            상세 분석 중… (성별·연령 DataLab 조회 포함, 최대 6초)
-          </p>
-        </div>
-      )}
+      <div style={{ padding:'24px' }}>
+        {loading && (
+          <div style={{ textAlign:'center', padding:'32px 0' }}>
+            <span className="spinner" style={{ width:24, height:24 }} />
+            <p style={{ marginTop:10, color:'var(--color-text-sub)', fontSize:13 }}>상세 분석 중… (성별·연령 포함 최대 7초)</p>
+          </div>
+        )}
+        {!loading && error && (
+          <div style={{ padding:'12px 16px', background:'#fef2f2', borderRadius:8, color:'#dc2626', fontSize:13 }}>❌ {error}</div>
+        )}
 
-      {/* 에러 */}
-      {!loading && error && (
-        <div style={{ padding: '10px 14px', background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 8, color: '#dc2626', fontSize: 13 }}>
-          ❌ {error}
-        </div>
-      )}
-
-      {/* 데이터 */}
-      {!loading && data && (
-        <>
-          {/* ── 연관 키워드 탭 ── */}
-          {tab === 'related' && (
-            <div>
-              {!data.hasAdApi && (
-                <div style={{ padding: '10px 14px', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 8, fontSize: 12, color: '#92400e', marginBottom: 14 }}>
-                  ⚠️ <strong>검색광고 API 3종 미설정</strong> — NAVER_AD_CUSTOMER_ID · NAVER_AD_ACCESS_LICENSE · NAVER_AD_SECRET_KEY 를 Railway에 설정해야 연관 키워드가 표시됩니다.
-                </div>
-              )}
-              {data.relatedKeywords?.length > 0 ? (
-                <div style={{ overflowX: 'auto' }}>
-                  <table className="data-table">
-                    <thead>
-                      <tr>
-                        <th>#</th>
-                        <th style={{ minWidth: 120 }}>연관 키워드</th>
-                        <th>등급</th>
-                        <th className="r">PC 검색</th>
-                        <th className="r">모바일</th>
-                        <th className="r">합계</th>
-                        <th>경쟁강도</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {data.relatedKeywords.map((r, idx) => (
-                        <tr key={r.keyword}>
-                          <td style={{ color: 'var(--color-text-sub)', fontSize: 12 }}>{idx + 1}</td>
-                          <td style={{ fontWeight: 600 }}>{r.keyword}</td>
-                          <td><GradeBadge grade={calcGradeFromTotal(r.total)} /></td>
-                          <td className="r">{fmtNum(r.pcSearch)}</td>
-                          <td className="r">{fmtNum(r.mobileSearch)}</td>
-                          <td className="r" style={{ fontWeight: 700, color: 'var(--color-primary)' }}>
-                            {fmtNum(r.total)}
-                          </td>
-                          <td>
-                            {r.compRaw ? (
-                              <span style={{
-                                display: 'inline-flex', padding: '2px 9px', borderRadius: 20,
-                                fontSize: 11, fontWeight: 700,
-                                background: COMP_BG[r.compRaw] ?? '#f3f4f6',
-                                color: COMP_COLOR[r.compRaw] ?? '#6b7280',
-                              }}>
-                                {COMP[r.compRaw] ?? r.compRaw}
-                              </span>
-                            ) : '-'}
-                          </td>
+        {!loading && data && (
+          <>
+            {/* ── 연관 키워드 ── */}
+            {tab === 'related' && (
+              <div>
+                {!data.hasAdApi && (
+                  <div style={{ marginBottom:14, padding:'10px 14px', background:'#fffbeb', border:'1px solid #fde68a', borderRadius:8, fontSize:12, color:'#92400e' }}>
+                    ⚠️ 검색광고 API 3종(CUSTOMER_ID 포함) 미설정 → Railway 환경변수에 추가하면 연관 키워드가 표시됩니다.
+                  </div>
+                )}
+                {data.relatedKeywords?.length > 0 ? (
+                  <div style={{ overflowX:'auto' }}>
+                    <table className="data-table">
+                      <thead>
+                        <tr>
+                          <th style={{ width:32 }}>#</th>
+                          <th style={{ minWidth:130 }}>연관 키워드</th>
+                          <th>등급</th>
+                          <th className="r">PC</th>
+                          <th className="r">모바일</th>
+                          <th className="r">합계</th>
+                          <th>경쟁강도</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ) : (
-                <div style={{ textAlign: 'center', padding: 24, color: 'var(--color-text-sub)', fontSize: 13 }}>
-                  연관 키워드 없음 (검색광고 API 키 설정 필요)
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* ── 성별·연령 탭 ── */}
-          {tab === 'demo' && (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 28 }}>
-
-              {/* 성별 비율 */}
-              <div>
-                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text-sub)', marginBottom: 12, textTransform: 'uppercase', letterSpacing: 1 }}>
-                  👥 성별 비율
-                </div>
-                {data.gender ? (
-                  <>
-                    <div style={{ borderRadius: 8, overflow: 'hidden', height: 26, display: 'flex', marginBottom: 12 }}>
-                      <div style={{ width: `${data.gender.male}%`, background: '#3b82f6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: '#fff', transition: 'width 0.5s' }}>
-                        {data.gender.male >= 12 && `${data.gender.male}%`}
-                      </div>
-                      <div style={{ width: `${data.gender.female}%`, background: '#ec4899', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: '#fff', transition: 'width 0.5s' }}>
-                        {data.gender.female >= 12 && `${data.gender.female}%`}
-                      </div>
-                    </div>
-                    <div style={{ display: 'flex', gap: 20, fontSize: 13 }}>
-                      <div><span style={{ color: '#3b82f6', fontWeight: 700 }}>남성</span> {data.gender.male}%</div>
-                      <div><span style={{ color: '#ec4899', fontWeight: 700 }}>여성</span> {data.gender.female}%</div>
-                    </div>
-                  </>
+                      </thead>
+                      <tbody>
+                        {data.relatedKeywords.map((r, idx) => (
+                          <tr key={r.keyword}>
+                            <td style={{ color:'#9ca3af', fontSize:11 }}>{idx+1}</td>
+                            <td style={{ fontWeight:600 }}>{r.keyword}</td>
+                            <td><GradeBadge grade={gradeFrom(r.total)} /></td>
+                            <td className="r">{fmtN(r.pcSearch)}</td>
+                            <td className="r">{fmtN(r.mobileSearch)}</td>
+                            <td className="r" style={{ fontWeight:700, color:'var(--color-primary)' }}>{fmtN(r.total)}</td>
+                            <td>
+                              {r.compRaw ? (
+                                <span style={{ display:'inline-flex', padding:'2px 8px', borderRadius:20, fontSize:11, fontWeight:700, background:COMP_BG[r.compRaw]??'#f3f4f6', color:COMP_COLOR[r.compRaw]??'#6b7280' }}>
+                                  {COMP_LABEL[r.compRaw]??r.compRaw}
+                                </span>
+                              ) : '-'}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 ) : (
-                  <div style={{ color: 'var(--color-text-sub)', fontSize: 13 }}>데이터 없음 (트렌드 API 오류 또는 검색량 부족)</div>
+                  <p style={{ textAlign:'center', color:'var(--color-text-sub)', fontSize:13, padding:'24px 0' }}>연관 키워드 없음 (검색광고 API 필요)</p>
                 )}
               </div>
+            )}
 
-              {/* 연령대 분포 */}
+            {/* ── 트렌드 ── */}
+            {tab === 'trend' && (
               <div>
-                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text-sub)', marginBottom: 12, textTransform: 'uppercase', letterSpacing: 1 }}>
-                  📊 연령대 분포
-                </div>
-                {data.ageGroups ? (
-                  data.ageGroups.map((ag, i) => (
-                    <PercentBar key={ag.label} label={ag.label} percent={ag.percent} color={AGE_COLORS[i]} />
-                  ))
+                {data.trendData?.length > 0 ? (
+                  <div>
+                    <p style={{ fontSize:12, color:'var(--color-text-sub)', marginBottom:16 }}>최근 12개월 검색 트렌드 (DataLab 상대 지수 기준)</p>
+                    <div style={{ display:'flex', alignItems:'flex-end', gap:4, height:120, borderBottom:'1px solid var(--color-border)', paddingBottom:4 }}>
+                      {data.trendData.map((d, i) => {
+                        const max = Math.max(...data.trendData.map(x => x.ratio), 1);
+                        const pct = (d.ratio / max) * 100;
+                        return (
+                          <div key={i} style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:4 }}>
+                            <div style={{ width:'100%', background:'var(--color-primary)', borderRadius:'3px 3px 0 0', height:`${pct}%`, minHeight:2, opacity:0.8 }} />
+                            <span style={{ fontSize:9, color:'#9ca3af', transform:'rotate(-45deg)', whiteSpace:'nowrap', transformOrigin:'top left' }}>
+                              {d.period?.slice(2,7)}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
                 ) : (
-                  <div style={{ color: 'var(--color-text-sub)', fontSize: 13 }}>데이터 없음</div>
+                  <p style={{ textAlign:'center', color:'var(--color-text-sub)', fontSize:13, padding:'24px 0' }}>트렌드 데이터 없음</p>
                 )}
               </div>
+            )}
 
-            </div>
-          )}
-        </>
-      )}
+            {/* ── 성향 분석 ── */}
+            {tab === 'demo' && (
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(220px,1fr))', gap:32 }}>
+                {/* 성별 */}
+                <div>
+                  <p style={{ fontSize:12, fontWeight:700, color:'var(--color-text-sub)', textTransform:'uppercase', letterSpacing:1, marginBottom:14 }}>성별 비율</p>
+                  {data.gender ? (
+                    <>
+                      <div style={{ height:28, borderRadius:6, overflow:'hidden', display:'flex', marginBottom:12 }}>
+                        <div style={{ width:`${data.gender.male}%`, background:'#3b82f6', display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:700, color:'#fff', transition:'width .5s' }}>
+                          {data.gender.male >= 10 && `${data.gender.male}%`}
+                        </div>
+                        <div style={{ width:`${data.gender.female}%`, background:'#ec4899', display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:700, color:'#fff', transition:'width .5s' }}>
+                          {data.gender.female >= 10 && `${data.gender.female}%`}
+                        </div>
+                      </div>
+                      <div style={{ display:'flex', gap:20, fontSize:13 }}>
+                        <span>🔵 남성 <strong>{data.gender.male}%</strong></span>
+                        <span>🩷 여성 <strong>{data.gender.female}%</strong></span>
+                      </div>
+                    </>
+                  ) : <p style={{ fontSize:13, color:'var(--color-text-sub)' }}>데이터 없음</p>}
+                </div>
+
+                {/* 연령대 */}
+                <div>
+                  <p style={{ fontSize:12, fontWeight:700, color:'var(--color-text-sub)', textTransform:'uppercase', letterSpacing:1, marginBottom:14 }}>연령대 분포</p>
+                  {data.ageGroups ? data.ageGroups.map((ag, i) => (
+                    <div key={ag.label} style={{ marginBottom:8 }}>
+                      <div style={{ display:'flex', justifyContent:'space-between', fontSize:12, marginBottom:3 }}>
+                        <span style={{ color:'var(--color-text-sub)' }}>{ag.label}</span>
+                        <span style={{ fontWeight:700, color:AGE_COLORS[i] }}>{ag.percent}%</span>
+                      </div>
+                      <div style={{ height:7, borderRadius:4, background:'#f3f4f6', overflow:'hidden' }}>
+                        <div style={{ height:'100%', borderRadius:4, width:`${ag.percent}%`, background:AGE_COLORS[i], transition:'width .5s' }} />
+                      </div>
+                    </div>
+                  )) : <p style={{ fontSize:13, color:'var(--color-text-sub)' }}>데이터 없음</p>}
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </div>
     </div>
   );
 }
 
-/* ── 메인 페이지 ─────────────────────────────────────────── */
+function gradeFrom(total) {
+  if (!total) return null;
+  if (total >= 30000) return 'diamond';
+  if (total >= 10000) return 'platinum';
+  if (total >= 3000)  return 'gold';
+  if (total >= 1000)  return 'silver';
+  if (total >= 300)   return 'bronze';
+  return 'seed';
+}
+
+/* ══════════════════════════════════════════════
+   키워드 결과 카드 (블랙키위 스타일)
+══════════════════════════════════════════════ */
+function KeywordCard({ r, defaultOpen = false }) {
+  const [open, setOpen] = useState(defaultOpen);
+
+  const hasSearch = r.totalSearch !== null;
+
+  return (
+    <div className="card" style={{ padding:0, overflow:'hidden', marginBottom:20 }}>
+      {/* ── 헤더 ── */}
+      <div style={{ padding:'16px 22px', display:'flex', alignItems:'center', justifyContent:'space-between', background:'#fff', borderBottom:'1px solid var(--color-border)', flexWrap:'wrap', gap:10 }}>
+        <div style={{ display:'flex', alignItems:'center', gap:12 }}>
+          <span style={{ fontWeight:800, fontSize:18, color:'var(--color-text)' }}>{r.keyword}</span>
+          <GradeBadge grade={r.grade} size="lg" />
+          {r.competition && (
+            <span style={{ display:'inline-flex', padding:'3px 11px', borderRadius:20, fontSize:11, fontWeight:700, background:COMP_BG[r.competition]??'#f3f4f6', color:COMP_COLOR[r.competition]??'#6b7280' }}>
+              경쟁 {COMP_LABEL[r.competition]??r.competition}
+            </span>
+          )}
+        </div>
+        <button
+          className={`btn ${open ? 'btn-primary' : 'btn-ghost'}`}
+          style={{ fontSize:12, padding:'5px 14px' }}
+          onClick={() => setOpen(v => !v)}>
+          {open ? '▲ 닫기' : '▼ 연관 키워드 · 성향 분석'}
+        </button>
+      </div>
+
+      {/* ── 메트릭 카드 2×2 ── */}
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(280px,1fr))', gap:0 }}>
+
+        {/* 월간 검색량 */}
+        <div style={{ padding:'22px 24px', borderRight:'1px solid var(--color-border)', borderBottom:'1px solid var(--color-border)' }}>
+          <p style={{ fontSize:11, fontWeight:700, color:'var(--color-text-sub)', textTransform:'uppercase', letterSpacing:1, marginBottom:18 }}>📊 월간 검색량</p>
+          <div style={{ display:'flex', gap:28 }}>
+            <MetricItem icon="🖥" label="PC"    value={fmtN(r.pcSearch)}     highlight={hasSearch} />
+            <MetricItem icon="📱" label="Mobile" value={fmtN(r.mobileSearch)} highlight={hasSearch} />
+            <MetricItem icon="➕" label="Total"  value={fmtN(r.totalSearch)}  highlight={hasSearch} big />
+          </div>
+          {!hasSearch && (
+            <p style={{ marginTop:10, fontSize:11, color:'#f59e0b' }}>
+              ⚠️ 검색광고 API 키 설정 필요 (Railway → NAVER_AD_CUSTOMER_ID 등 3종)
+            </p>
+          )}
+        </div>
+
+        {/* 콘텐츠 발행량 */}
+        <div style={{ padding:'22px 24px', borderBottom:'1px solid var(--color-border)' }}>
+          <p style={{ fontSize:11, fontWeight:700, color:'var(--color-text-sub)', textTransform:'uppercase', letterSpacing:1, marginBottom:18 }}>📄 콘텐츠 발행량 (누적)</p>
+          <div style={{ display:'flex', gap:28 }}>
+            <MetricItem icon="📝" label="블로그" value={fmtN(r.blogTotal)}    highlight />
+            <MetricItem icon="☕" label="카페"   value={fmtN(r.cafeTotal)}    highlight />
+            <MetricItem icon="📋" label="전체"   value={fmtN(r.totalContent)} highlight big />
+          </div>
+        </div>
+
+        {/* 월간 발행량 */}
+        <div style={{ padding:'22px 24px', borderRight:'1px solid var(--color-border)' }}>
+          <p style={{ fontSize:11, fontWeight:700, color:'var(--color-text-sub)', textTransform:'uppercase', letterSpacing:1, marginBottom:18 }}>📅 월간 발행량 (추정)</p>
+          <div style={{ display:'flex', gap:28 }}>
+            <MetricItem icon="📝" label="블로그" value={`${fmtN(r.blogMonthly)}+`} highlight />
+            <MetricItem icon="☕" label="카페"   value={`${fmtN(r.cafeMonthly)}+`} highlight />
+          </div>
+          <p style={{ marginTop:10, fontSize:10, color:'var(--color-text-muted)' }}>* 최근 100건 날짜 범위 기반 추정치</p>
+        </div>
+
+        {/* 콘텐츠 포화도 지수 */}
+        <div style={{ padding:'22px 24px' }}>
+          <p style={{ fontSize:11, fontWeight:700, color:'var(--color-text-sub)', textTransform:'uppercase', letterSpacing:1, marginBottom:18 }}>🎯 콘텐츠 포화도 지수</p>
+          {hasSearch ? (
+            <div style={{ display:'flex', gap:24 }}>
+              <SatItem label="블로그" pct={r.blogSatPct} />
+              <SatItem label="카페"   pct={r.cafeSatPct} />
+              <SatItem label="전체"   pct={r.totalSatPct} big />
+            </div>
+          ) : (
+            <p style={{ fontSize:12, color:'#9ca3af' }}>검색량 데이터 필요</p>
+          )}
+          <p style={{ marginTop:10, fontSize:10, color:'var(--color-text-muted)' }}>* 포화도 = (월발행÷월검색) × 100</p>
+        </div>
+
+      </div>
+
+      {/* ── 상세 패널 ── */}
+      {open && <DetailPanel keyword={r.keyword} />}
+    </div>
+  );
+}
+
+/* ── 개별 숫자 메트릭 ── */
+function MetricItem({ icon, label, value, highlight, big }) {
+  return (
+    <div style={{ textAlign:'center' }}>
+      <div style={{ fontSize:big ? 22 : 18, fontWeight:800, color: highlight ? 'var(--color-text)' : '#9ca3af', letterSpacing:-0.5 }}>
+        {value}
+      </div>
+      <div style={{ fontSize:11, color:'var(--color-text-sub)', marginTop:4 }}>{icon} {label}</div>
+    </div>
+  );
+}
+
+/* ── 포화도 지수 아이템 ── */
+function SatItem({ label, pct, big }) {
+  const color = satColor(pct);
+  const lbl   = satLabel(pct);
+  return (
+    <div style={{ textAlign:'center' }}>
+      <div style={{ fontSize: big ? 22 : 18, fontWeight:800, color, letterSpacing:-0.5 }}>
+        {fmtPct(pct)}
+      </div>
+      <div style={{ fontSize:10, fontWeight:700, color, marginTop:2 }}>{lbl}</div>
+      <div style={{ fontSize:11, color:'var(--color-text-sub)', marginTop:2 }}>{label}</div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════
+   메인 페이지
+══════════════════════════════════════════════ */
 export default function KeywordAnalysisPage() {
-  const [input, setInput]           = useState('');
-  const [results, setResults]       = useState([]);
-  const [loading, setLoading]       = useState(false);
-  const [error, setError]           = useState('');
-  const [hasAdApi, setHasAdApi]     = useState(true);
-  const [expandedKw, setExpandedKw] = useState(null);
+  const [input, setInput]       = useState('');
+  const [results, setResults]   = useState([]);
+  const [loading, setLoading]   = useState(false);
+  const [error, setError]       = useState('');
+  const [hasAdApi, setHasAdApi] = useState(true);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     const keywords = input.split('\n').map(k => k.trim()).filter(Boolean);
     if (!keywords.length) { setError('키워드를 입력해주세요.'); return; }
     if (keywords.length > 30) { setError('최대 30개까지 가능합니다.'); return; }
-    setLoading(true); setError(''); setResults([]); setExpandedKw(null);
+    setLoading(true); setError(''); setResults([]);
     try {
       const res  = await fetch('/api/keyword-analysis', {
         method: 'POST',
@@ -306,7 +413,7 @@ export default function KeywordAnalysisPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
-      setResults(data.results || []);
+      setResults(data.results ?? []);
       setHasAdApi(data.hasAdApi !== false);
     } catch (err) {
       setError(err.message);
@@ -317,210 +424,122 @@ export default function KeywordAnalysisPage() {
 
   const downloadCsv = () => {
     if (!results.length) return;
-    const header = ['키워드','등급','PC 검색량','모바일 검색량','합계','경쟁강도','포화도','블로그월발행','블로그누적','카페월발행','카페누적'];
+    const header = ['키워드','등급','PC검색','모바일검색','합계','경쟁강도','블로그누적','카페누적','전체누적','블로그월발행','카페월발행','블로그포화도%','카페포화도%','전체포화도%'];
     const rows = results.map(r => [
       r.keyword,
-      r.grade ? (GRADES[r.grade]?.label ?? r.grade) : '-',
-      r.pcSearch ?? '-', r.mobileSearch ?? '-', r.totalSearch ?? '-',
-      r.competition ? (COMP[r.competition] ?? r.competition) : '-',
-      r.saturation ? (SATURATIONS[r.saturation]?.label ?? r.saturation) : '-',
-      r.blogMonthly, r.blogTotal, r.cafeMonthly, r.cafeTotal,
+      r.grade ? GRADES[r.grade]?.label : '-',
+      r.pcSearch??'-', r.mobileSearch??'-', r.totalSearch??'-',
+      r.competition ? COMP_LABEL[r.competition] : '-',
+      r.blogTotal, r.cafeTotal, r.totalContent,
+      r.blogMonthly, r.cafeMonthly,
+      r.blogSatPct??'-', r.cafeSatPct??'-', r.totalSatPct??'-',
     ]);
-    const csv = [header, ...rows]
-      .map(row => row.map(c => `"${String(c).replace(/"/g, '""')}"`).join(','))
-      .join('\n');
-    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = 'keyword-analysis.csv'; a.click();
-    URL.revokeObjectURL(url);
+    const csv = [header,...rows].map(row=>row.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
+    const blob = new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8;'});
+    const url  = URL.createObjectURL(blob);
+    const a    = Object.assign(document.createElement('a'),{href:url,download:'keyword-analysis.csv'});
+    a.click(); URL.revokeObjectURL(url);
   };
 
-  const toggleRow = (kw) => setExpandedKw(prev => prev === kw ? null : kw);
+  /* ── 여러 키워드일 때 요약 테이블 (상단) ── */
+  const showSummary = results.length > 1;
 
   return (
     <div>
-      <div className="page-header">
-        <h1 className="page-title">키워드 분석</h1>
-        <p className="page-desc">검색량 · 등급 · 포화도 · 발행량 · 연관키워드 · 성별/연령 분포</p>
-      </div>
-
       {/* 입력 카드 */}
-      <div className="card" style={{ marginBottom: 20 }}>
+      <div className="card" style={{ marginBottom:20 }}>
         <form onSubmit={handleSubmit}>
-          <label className="kw-label">
-            키워드 목록
-            <span className="kw-label-hint">한 줄에 하나 · 최대 30개</span>
+          <label style={{ display:'block', fontSize:12, fontWeight:700, color:'var(--color-text-sub)', textTransform:'uppercase', letterSpacing:'0.04em', marginBottom:8 }}>
+            키워드 목록 <span style={{ fontSize:11, fontWeight:400, textTransform:'none', letterSpacing:0, marginLeft:6, color:'var(--color-text-muted)' }}>한 줄에 하나 · 최대 30개</span>
           </label>
           <textarea
-            className="kw-textarea"
-            rows={5}
+            rows={4}
             value={input}
             onChange={e => setInput(e.target.value)}
-            placeholder={'pc방창업\n만화카페창업\n코인노래방창업'}
+            placeholder={'PC방창업\n만화카페창업\n코인노래방창업'}
+            style={{ width:'100%', padding:'10px 12px', border:'1px solid var(--color-border)', borderRadius:'var(--radius-sm)', fontSize:14, fontFamily:'var(--font-base)', resize:'vertical', background:'var(--color-bg)', color:'var(--color-text)' }}
           />
-          {error && <div className="field-error">{error}</div>}
-          <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
+          {error && <div style={{ marginTop:8, padding:'8px 12px', background:'#fef2f2', border:'1px solid #fca5a5', borderRadius:'var(--radius-sm)', color:'#dc2626', fontSize:13 }}>{error}</div>}
+          <div style={{ display:'flex', gap:8, marginTop:14 }}>
             <button type="submit" className="btn btn-primary" disabled={loading}>
               {loading ? <><span className="spinner" /> 조회 중…</> : '🔍 검색량 분석'}
             </button>
             {results.length > 0 && (
-              <button type="button" className="btn btn-secondary" onClick={downloadCsv}>
-                📥 CSV 다운로드
-              </button>
+              <button type="button" className="btn btn-secondary" onClick={downloadCsv}>📥 CSV</button>
             )}
           </div>
         </form>
       </div>
 
-      {/* 검색광고 API 경고 */}
+      {/* API 경고 */}
       {!hasAdApi && results.length > 0 && (
-        <div className="notice-warn">
-          ⚠️ <strong>검색광고 API 미설정</strong> — PC/모바일 검색량 · 경쟁강도 · 연관키워드를 보려면
-          Railway 환경변수에 <strong>NAVER_AD_CUSTOMER_ID</strong> · NAVER_AD_ACCESS_LICENSE · NAVER_AD_SECRET_KEY 3개를 모두 설정하세요.
+        <div style={{ padding:'10px 16px', background:'#fffbeb', border:'1px solid #fde68a', borderRadius:8, fontSize:12, color:'#92400e', marginBottom:16, lineHeight:1.7 }}>
+          ⚠️ <strong>검색광고 API 미설정</strong> — Railway 환경변수에 <strong>NAVER_AD_CUSTOMER_ID · NAVER_AD_ACCESS_LICENSE · NAVER_AD_SECRET_KEY</strong> 3개를 모두 등록해야 검색량이 표시됩니다.
         </div>
       )}
 
       {/* 등급 범례 */}
       {results.length > 0 && (
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 14, alignItems: 'center' }}>
-          {Object.entries(GRADES).map(([k, g]) => (
-            <span key={k} style={{
-              display: 'inline-flex', alignItems: 'center', gap: 3,
-              padding: '2px 9px', borderRadius: 20, fontSize: 11, fontWeight: 600,
-              background: g.bg, color: g.color, border: `1px solid ${g.color}30`,
-            }}>
-              {g.icon} {g.label}
+        <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:16, alignItems:'center' }}>
+          {Object.entries(GRADES).map(([k,g]) => (
+            <span key={k} style={{ display:'inline-flex', alignItems:'center', gap:3, padding:'2px 9px', borderRadius:20, fontSize:11, fontWeight:600, background:g.bg, color:g.color, border:`1px solid ${g.color}30` }}>
+              {g.icon} {g.label} <span style={{ opacity:.6 }}>{g.range}</span>
             </span>
           ))}
-          <span style={{ fontSize: 11, color: 'var(--color-text-sub)', marginLeft: 4 }}>← 총 월간 검색량 기준</span>
         </div>
       )}
 
-      {/* 결과 테이블 */}
-      {results.length > 0 && (
-        <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-          {/* 테이블 헤더 */}
-          <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--color-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span className="section-label">분석 결과</span>
-            <span style={{ fontSize: 12, color: 'var(--color-text-sub)' }}>
-              {results.length}개 키워드 · 행 클릭 → 연관키워드/성별연령 상세보기
-            </span>
+      {/* 여러 키워드: 상단 요약 테이블 */}
+      {showSummary && (
+        <div className="card" style={{ marginBottom:24, padding:0, overflow:'hidden' }}>
+          <div style={{ padding:'12px 18px', borderBottom:'1px solid var(--color-border)', fontSize:12, fontWeight:700, color:'var(--color-text-sub)', textTransform:'uppercase', letterSpacing:1 }}>
+            요약 비교 ({results.length}개)
           </div>
-
-          <div className="table-wrap">
-            <table className="data-table">
+          <div style={{ overflowX:'auto' }}>
+            <table className="data-table" style={{ fontSize:12 }}>
               <thead>
                 <tr>
-                  <th style={{ minWidth: 120 }}>키워드</th>
+                  <th style={{ minWidth:110 }}>키워드</th>
                   <th>등급</th>
                   <th className="r">PC</th>
                   <th className="r">모바일</th>
                   <th className="r">합계</th>
-                  <th>경쟁강도</th>
-                  <th>포화도</th>
-                  <th className="r">블로그월</th>
+                  <th>경쟁</th>
                   <th className="r">블로그누적</th>
-                  <th className="r">카페월</th>
                   <th className="r">카페누적</th>
-                  <th></th>
+                  <th className="r">블로그포화도</th>
+                  <th className="r">카페포화도</th>
+                  <th className="r">전체포화도</th>
                 </tr>
               </thead>
               <tbody>
-                {results.flatMap(r => {
-                  const isOpen = expandedKw === r.keyword;
-                  const rows = [
-                    <tr
-                      key={r.keyword}
-                      style={{ cursor: 'pointer', background: isOpen ? 'rgba(3,199,90,0.04)' : undefined }}
-                      onClick={() => toggleRow(r.keyword)}
-                    >
-                      <td style={{ fontWeight: 700 }}>{r.keyword}</td>
-                      <td><GradeBadge grade={r.grade} /></td>
-                      <td className="r">{fmtNum(r.pcSearch)}</td>
-                      <td className="r">{fmtNum(r.mobileSearch)}</td>
-                      <td className="r" style={{ fontWeight: 700, color: 'var(--color-primary)' }}>
-                        {fmtNum(r.totalSearch)}
-                      </td>
-                      <td>
-                        {r.competition ? (
-                          <span style={{
-                            display: 'inline-flex', padding: '2px 9px', borderRadius: 20,
-                            fontSize: 11, fontWeight: 700,
-                            background: COMP_BG[r.competition] ?? '#f3f4f6',
-                            color: COMP_COLOR[r.competition] ?? '#6b7280',
-                          }}>
-                            {COMP[r.competition] ?? r.competition}
-                          </span>
-                        ) : '-'}
-                      </td>
-                      <td><SatBadge saturation={r.saturation} /></td>
-                      <td className="r">{r.blogMonthly.toLocaleString()}+</td>
-                      <td className="r">{r.blogTotal.toLocaleString()}</td>
-                      <td className="r">{r.cafeMonthly.toLocaleString()}+</td>
-                      <td className="r">{r.cafeTotal.toLocaleString()}</td>
-                      <td style={{ textAlign: 'center', fontSize: 11, color: isOpen ? 'var(--color-primary)' : 'var(--color-text-sub)', fontWeight: 600, whiteSpace: 'nowrap' }}>
-                        {isOpen ? '▲ 닫기' : '▼ 상세'}
-                      </td>
-                    </tr>,
-                  ];
-                  if (isOpen) {
-                    rows.push(
-                      <tr key={`${r.keyword}__detail`}>
-                        <td colSpan={12} style={{ padding: 0 }}>
-                          <DetailPanel keyword={r.keyword} />
-                        </td>
-                      </tr>
-                    );
-                  }
-                  return rows;
-                })}
+                {results.map(r => (
+                  <tr key={r.keyword}>
+                    <td style={{ fontWeight:700 }}>{r.keyword}</td>
+                    <td><GradeBadge grade={r.grade} /></td>
+                    <td className="r">{fmtN(r.pcSearch)}</td>
+                    <td className="r">{fmtN(r.mobileSearch)}</td>
+                    <td className="r" style={{ fontWeight:700, color:'var(--color-primary)' }}>{fmtN(r.totalSearch)}</td>
+                    <td>
+                      {r.competition ? <span style={{ display:'inline-flex', padding:'2px 7px', borderRadius:20, fontSize:10, fontWeight:700, background:COMP_BG[r.competition]??'#f3f4f6', color:COMP_COLOR[r.competition]??'#6b7280' }}>{COMP_LABEL[r.competition]}</span> : '-'}
+                    </td>
+                    <td className="r">{fmtN(r.blogTotal)}</td>
+                    <td className="r">{fmtN(r.cafeTotal)}</td>
+                    <td className="r" style={{ color:satColor(r.blogSatPct), fontWeight:700 }}>{fmtPct(r.blogSatPct)}</td>
+                    <td className="r" style={{ color:satColor(r.cafeSatPct), fontWeight:700 }}>{fmtPct(r.cafeSatPct)}</td>
+                    <td className="r" style={{ color:satColor(r.totalSatPct), fontWeight:700 }}>{fmtPct(r.totalSatPct)}</td>
+                  </tr>
+                ))}
               </tbody>
             </table>
-          </div>
-
-          <div style={{ padding: '10px 20px', borderTop: '1px solid var(--color-border)' }}>
-            <p style={{ fontSize: 11, color: 'var(--color-text-muted)', margin: 0 }}>
-              * 블로그/카페 월발행: 최근 100건 pubDate 기준 추정 · 누적: 네이버 검색 총 결과수
-              · 포화도: 월발행 1,000건/총검색량 비율 (낮을수록 블루오션)
-              · 성별/연령: DataLab 상대적 관심도 기반 추정치
-            </p>
           </div>
         </div>
       )}
 
-      <style>{`
-        .kw-label {
-          display: block; font-size: 12px; font-weight: 700;
-          color: var(--color-text-sub); text-transform: uppercase;
-          letter-spacing: 0.04em; margin-bottom: 8px;
-        }
-        .kw-label-hint {
-          font-size: 11px; font-weight: 400; text-transform: none;
-          letter-spacing: 0; margin-left: 8px; color: var(--color-text-muted);
-        }
-        .kw-textarea {
-          width: 100%; padding: 10px 12px;
-          border: 1px solid var(--color-border); border-radius: var(--radius-sm);
-          font-size: 14px; font-family: var(--font-base);
-          resize: vertical; background: var(--color-bg); color: var(--color-text);
-        }
-        .kw-textarea:focus {
-          border-color: var(--color-primary); outline: none;
-          box-shadow: 0 0 0 3px rgba(3,199,90,0.12);
-        }
-        .field-error {
-          margin-top: 8px; padding: 8px 12px;
-          background: #fef2f2; border: 1px solid #fca5a5;
-          border-radius: var(--radius-sm); color: var(--color-danger); font-size: 13px;
-        }
-        .notice-warn {
-          background: #fffbeb; border: 1px solid #fde68a;
-          border-radius: var(--radius-sm); padding: 10px 14px;
-          font-size: 12px; color: #92400e; margin-bottom: 16px; line-height: 1.6;
-        }
-        .data-table tbody tr:hover td { background: rgba(0,0,0,0.015); }
-      `}</style>
+      {/* 키워드별 상세 카드 */}
+      {results.map((r, i) => (
+        <KeywordCard key={r.keyword} r={r} defaultOpen={results.length === 1} />
+      ))}
     </div>
   );
 }
