@@ -59,12 +59,22 @@ export async function POST(request) {
       .sort((a, b) => b.total - a.total)
       .slice(0, 30);
 
+    // 조회 키워드 자체의 클릭 통계 (keywordstool 응답에서 추출)
+    const kl    = keyword.toLowerCase();
+    const exact = list.find(i => (i.relKeyword ?? '').toLowerCase() === kl) ?? list[0] ?? null;
+    const mainStats = exact ? {
+      pcCtr:        exact.monthlyAvePcCtr        ?? null,
+      mobileCtr:    exact.monthlyAveMobileCtr    ?? null,
+      pcClkCnt:     exact.monthlyAvePcClkCnt     ?? null,
+      mobileClkCnt: exact.monthlyAveMobileClkCnt ?? null,
+      avgDepth:     exact.plAvgDepth             ?? null,
+    } : null;
+
     return NextResponse.json({
       keyword,
       relatedKeywords,
-      gender:    demo.gender     ?? null,
-      ageGroups: demo.ageGroups  ?? null,
-      trendData: demo.trendData  ?? [],
+      trendData:  demo.trendData ?? [],
+      mainStats,
       hasAdApi,
     });
   } catch (err) {

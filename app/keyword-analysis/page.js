@@ -105,7 +105,7 @@ function DetailPanel({ keyword }) {
   const TABS = [
     { key: 'related', label: '🔗 연관 키워드' },
     { key: 'trend',   label: '📈 트렌드' },
-    { key: 'demo',    label: '👥 성향 분석' },
+    { key: 'click',   label: '🖱 클릭 분석' },
   ];
 
   return (
@@ -209,50 +209,46 @@ function DetailPanel({ keyword }) {
                     </div>
                   </div>
                 ) : (
-                  <p style={{ textAlign:'center', color:'var(--color-text-sub)', fontSize:13, padding:'24px 0' }}>트렌드 데이터 없음</p>
+                  <p style={{ textAlign:'center', color:'var(--color-text-sub)', fontSize:13, padding:'24px 0' }}>
+                    트렌드 데이터 없음<br/>
+                    <span style={{ fontSize:11, color:'var(--color-text-muted)' }}>(검색량이 낮은 키워드는 DataLab에 데이터가 없을 수 있습니다)</span>
+                  </p>
                 )}
               </div>
             )}
 
-            {/* ── 성향 분석 ── */}
-            {tab === 'demo' && (
-              <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(220px,1fr))', gap:32 }}>
-                {/* 성별 */}
-                <div>
-                  <p style={{ fontSize:12, fontWeight:700, color:'var(--color-text-sub)', textTransform:'uppercase', letterSpacing:1, marginBottom:14 }}>성별 비율</p>
-                  {data.gender ? (
-                    <>
-                      <div style={{ height:28, borderRadius:6, overflow:'hidden', display:'flex', marginBottom:12 }}>
-                        <div style={{ width:`${data.gender.male}%`, background:'#3b82f6', display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:700, color:'#fff', transition:'width .5s' }}>
-                          {data.gender.male >= 10 && `${data.gender.male}%`}
-                        </div>
-                        <div style={{ width:`${data.gender.female}%`, background:'#ec4899', display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:700, color:'#fff', transition:'width .5s' }}>
-                          {data.gender.female >= 10 && `${data.gender.female}%`}
-                        </div>
-                      </div>
-                      <div style={{ display:'flex', gap:20, fontSize:13 }}>
-                        <span>🔵 남성 <strong>{data.gender.male}%</strong></span>
-                        <span>🩷 여성 <strong>{data.gender.female}%</strong></span>
-                      </div>
-                    </>
-                  ) : <p style={{ fontSize:13, color:'var(--color-text-sub)' }}>데이터 없음</p>}
-                </div>
-
-                {/* 연령대 */}
-                <div>
-                  <p style={{ fontSize:12, fontWeight:700, color:'var(--color-text-sub)', textTransform:'uppercase', letterSpacing:1, marginBottom:14 }}>연령대 분포</p>
-                  {data.ageGroups ? data.ageGroups.map((ag, i) => (
-                    <div key={ag.label} style={{ marginBottom:8 }}>
-                      <div style={{ display:'flex', justifyContent:'space-between', fontSize:12, marginBottom:3 }}>
-                        <span style={{ color:'var(--color-text-sub)' }}>{ag.label}</span>
-                        <span style={{ fontWeight:700, color:AGE_COLORS[i] }}>{ag.percent}%</span>
-                      </div>
-                      <div style={{ height:7, borderRadius:4, background:'#f3f4f6', overflow:'hidden' }}>
-                        <div style={{ height:'100%', borderRadius:4, width:`${ag.percent}%`, background:AGE_COLORS[i], transition:'width .5s' }} />
-                      </div>
-                    </div>
-                  )) : <p style={{ fontSize:13, color:'var(--color-text-sub)' }}>데이터 없음</p>}
-                </div>
+            {/* ── 클릭 분석 ── */}
+            {tab === 'click' && (
+              <div>
+                <p style={{ fontSize:12, color:'var(--color-text-sub)', marginBottom:20 }}>
+                  네이버 검색광고 기준 클릭 성과 데이터 (광고 노출 키워드 기준)
+                </p>
+                {data.mainStats ? (
+                  <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(150px,1fr))', gap:16 }}>
+                    <ClickStat label="PC 클릭률 (CTR)"
+                      value={data.mainStats.pcCtr != null ? `${data.mainStats.pcCtr}%` : '-'}
+                      sub="PC 노출 대비 클릭률" color="#3b82f6" />
+                    <ClickStat label="모바일 클릭률"
+                      value={data.mainStats.mobileCtr != null ? `${data.mainStats.mobileCtr}%` : '-'}
+                      sub="모바일 노출 대비 클릭률" color="#10b981" />
+                    <ClickStat label="PC 월평균 클릭수"
+                      value={data.mainStats.pcClkCnt != null ? fmtN(Math.round(data.mainStats.pcClkCnt)) : '-'}
+                      sub="광고 월평균 클릭 횟수" color="#6366f1" />
+                    <ClickStat label="모바일 월평균 클릭수"
+                      value={data.mainStats.mobileClkCnt != null ? fmtN(Math.round(data.mainStats.mobileClkCnt)) : '-'}
+                      sub="광고 월평균 클릭 횟수" color="#f59e0b" />
+                    <ClickStat label="평균 노출순위"
+                      value={data.mainStats.avgDepth != null ? `${data.mainStats.avgDepth}위` : '-'}
+                      sub="파워링크 평균 노출 위치" color="#ef4444" />
+                  </div>
+                ) : (
+                  <p style={{ textAlign:'center', color:'var(--color-text-sub)', fontSize:13, padding:'24px 0' }}>
+                    {data.hasAdApi ? '클릭 데이터 없음' : '검색광고 API 필요 (NAVER_AD_* 3종)'}
+                  </p>
+                )}
+                <p style={{ marginTop:20, fontSize:11, color:'var(--color-text-muted)', padding:'10px 14px', background:'#f8fafc', borderRadius:6 }}>
+                  ℹ️ 성별·연령 통계는 네이버 내부 광고 시스템 전용으로 외부 공개 API를 통해 제공되지 않습니다.
+                </p>
               </div>
             )}
           </>
@@ -370,6 +366,19 @@ function MetricItem({ icon, label, value, highlight, big }) {
         {value}
       </div>
       <div style={{ fontSize:11, color:'var(--color-text-sub)', marginTop:4 }}>{icon} {label}</div>
+    </div>
+  );
+}
+
+/* ── 클릭 통계 카드 ── */
+function ClickStat({ label, value, sub, color }) {
+  return (
+    <div style={{ textAlign:'center', padding:'18px 12px', background:'#f8fafc', borderRadius:10, border:'1px solid #e5e7eb' }}>
+      <div style={{ fontSize:22, fontWeight:800, color: value === '-' ? '#9ca3af' : color, letterSpacing:-0.5 }}>
+        {value}
+      </div>
+      <div style={{ fontSize:12, fontWeight:700, color:'var(--color-text)', marginTop:6 }}>{label}</div>
+      <div style={{ fontSize:10, color:'var(--color-text-muted)', marginTop:3 }}>{sub}</div>
     </div>
   );
 }
