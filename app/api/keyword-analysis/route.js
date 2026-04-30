@@ -36,9 +36,17 @@ async function getPublishCount(keyword, channel, clientId, clientSecret) {
     const items = data.items ?? [];
 
     // 날짜 범위로 월간 발행량 추정
+    // ※ 카페 API의 postdate는 "YYYYMMDD" 형식 → new Date()가 Invalid Date를 반환하므로 직접 파싱
     const dated = items
       .map(i => {
-        const raw = i.pubDate || i.postdate || '';
+        let raw = i.pubDate || '';
+        if (!raw && i.postdate) {
+          // "20230109" → "2023-01-09"
+          const s = String(i.postdate);
+          raw = s.length === 8
+            ? `${s.slice(0,4)}-${s.slice(4,6)}-${s.slice(6,8)}`
+            : s;
+        }
         const t = new Date(raw).getTime();
         return isNaN(t) ? null : t;
       })
@@ -123,12 +131,13 @@ export async function POST(request) {
         const mobileSearch = exact ? (exact.monthlyMobileQcCnt ?? 0) : null;
         const totalSearch  = pcSearch !== null ? pcSearch + mobileSearch : null;
 
-        // 포화도 % = (월발행 / 월검색) × 100
-        const ts           = totalSearch && totalSearch > 0 ? totalSearch : null;
-        const blogSatPct   = ts ? Math.min(999, Math.round(blog.monthly / ts * 100)) : null;
-        const cafeSatPct   = ts ? Math.min(999, Math.round(cafe.monthly / ts * 100)) : null;
-        const totalSatPct  = (blogSatPct !== null && cafeSatPct !== null)
-                             ? blogSatPct + cafeSatPct : null;
+        // 포화도 % = (월발행 / 월검색) × 100  (소수점 1자리 반올림 — 0%로 뭉개지는 문제 방지)
+        const ts          = totalSearch && totalSearch > 0 ? totalSearch : null;
+        const roundSat    = v => Math.min(999, Math.round(v * 10) / 10); // 소수점 1자리
+        const blogSatPct  = ts ? roundSat(blog.monthly / ts * 100) : null;
+        const cafeSatPct  = ts ? roundSat(cafe.monthly / ts * 100) : null;
+        const totalSatPct = (blogSatPct !== null && cafeSatPct !== null)
+                            ? roundSat(blogSatPct + cafeSatPct) : null;
 
         return {
           keyword:     kw,

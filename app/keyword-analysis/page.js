@@ -25,7 +25,9 @@ function fmtN(n) {
 }
 function fmtPct(p) {
   if (p === null || p === undefined) return '-';
-  return `${p}%`;
+  // 1 미만이면 소수점 1자리 표시 (0.3%), 1 이상이면 정수
+  if (p > 0 && p < 1) return `${p.toFixed(1)}%`;
+  return `${Math.round(p)}%`;
 }
 
 /* ── 등급 뱃지 ── */
@@ -51,7 +53,8 @@ function satColor(pct) {
   return '#dc2626';
 }
 function satLabel(pct) {
-  if (pct === null) return '-';
+  if (pct === null || pct === undefined) return '-';
+  if (pct === 0) return '데이터 없음';
   if (pct < 10)  return '매우 낮음';
   if (pct < 30)  return '낮음';
   if (pct < 50)  return '높음';
