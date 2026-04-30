@@ -82,6 +82,166 @@ function Sparkline({ data, color = '#03c75a', w = 120, h = 36 }) {
 }
 
 /* ══════════════════════════════════════════════
+   내 광고 성과 패널
+══════════════════════════════════════════════ */
+function MyAdPanel({ keyword }) {
+  const [data, setData]       = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError]     = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true); setData(null); setError('');
+    fetch('/api/ad-comparison', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ keywords: [keyword] }),
+    })
+      .then(r => r.json().then(j => ({ ok: r.ok, j })))
+      .then(({ ok, j }) => { if (!cancelled) { if (!ok) throw new Error(j.error); setData(j); } })
+      .catch(e => { if (!cancelled) setError(e.message); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [keyword]);
+
+  if (loading) return (
+    <div style={{ textAlign:'center', padding:'32px 0' }}>
+      <span className="spinner" style={{ width:24, height:24 }} />
+      <p style={{ marginTop:10, color:'var(--color-text-sub)', fontSize:13 }}>광고 계정 데이터 조회 중…</p>
+    </div>
+  );
+  if (error) return (
+    <div style={{ padding:'12px 16px', background:'#fef2f2', borderRadius:8, color:'#dc2626', fontSize:13 }}>
+      ❌ {error}
+    </div>
+  );
+  if (!data) return null;
+
+  const row    = data.comparison?.[0];
+  const market = row?.market ?? null;
+  const accounts = row?.accounts ?? [];
+
+  const ctrScoreStyle = (score) => ({
+    good: { color:'#16a34a', bg:'#dcfce7', label:'▲ 시장 상회' },
+    avg:  { color:'#d97706', bg:'#fef9c3', label:'→ 시장 평균' },
+    bad:  { color:'#dc2626', bg:'#fee2e2', label:'▼ 시장 하회' },
+  }[score] ?? { color:'#9ca3af', bg:'#f3f4f6', label:'-' });
+
+  const statusStyle = (s) =>
+    s === '운영중'  ? { color:'#16a34a', bg:'#dcfce7' } :
+    s === '중지'    ? { color:'#dc2626', bg:'#fee2e2' } :
+    s === '예산소진' ? { color:'#d97706', bg:'#fef9c3' } :
+                     { color:'#9ca3af', bg:'#f3f4f6' };
+
+  return (
+    <div>
+      <p style={{ fontSize:12, color:'var(--color-text-sub)', marginBottom:20 }}>
+        등록된 광고 계정의 최근 30일 성과 vs 시장 평균 (keywordstool 기준)
+      </p>
+
+      {/* 시장 평균 기준값 */}
+      {market && (
+        <div style={{ display:'flex', gap:12, flexWrap:'wrap', marginBottom:20, padding:'12px 16px', background:'#f8fafc', borderRadius:10, border:'1px solid #e5e7eb' }}>
+          <span style={{ fontSize:11, fontWeight:700, color:'var(--color-text-sub)', width:'100%', marginBottom:4 }}>📊 시장 평균 (keywordstool)</span>
+          <AdStat label="월 검색량"    value={fmtN(market.totalSearch) + '건'} color="#6366f1" />
+          <AdStat label="PC CTR"       value={market.marketPcCtr  != null ? `${market.marketPcCtr}%`  : '-'} color="#3b82f6" />
+          <AdStat label="모바일 CTR"   value={market.marketMobCtr != null ? `${market.marketMobCtr}%` : '-'} color="#10b981" />
+          <AdStat label="PC 월평균클릭" value={market.marketPcClk  != null ? fmtN(Math.round(market.marketPcClk)) + '회' : '-'} color="#f59e0b" />
+          <AdStat label="평균 노출순위" value={market.marketAvgDepth != null ? `${market.marketAvgDepth}위` : '-'} color="#ef4444" />
+        </div>
+      )}
+
+      {/* 계정별 성과 */}
+      {accounts.length === 0 && (
+        <div style={{ padding:'14px 16px', background:'#fffbeb', border:'1px solid #fde68a', borderRadius:8, fontSize:13, color:'#92400e' }}>
+          ⚠️ 등록된 광고 계정이 없습니다. Railway 환경변수에 NAVER_AD_ACCOUNT_NAME_2 등을 설정해주세요.
+        </div>
+      )}
+
+      <div style={{ display:'grid', gridTemplateColumns:`repeat(${Math.min(accounts.length, 2)}, 1fr)`, gap:16 }}>
+        {accounts.map((acc, i) => {
+          const ss = statusStyle(acc.status);
+          const cs = acc.ctrScore ? ctrScoreStyle(acc.ctrScore) : null;
+          return (
+            <div key={i} style={{ border:`2px solid ${acc.found ? (acc.isActive ? '#03c75a' : '#f87171') : '#e5e7eb'}`, borderRadius:12, overflow:'hidden' }}>
+              {/* 계정 헤더 */}
+              <div style={{ padding:'10px 16px', background: acc.found ? (acc.isActive ? '#f0fdf4' : '#fef2f2') : '#f9fafb', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                <span style={{ fontWeight:700, fontSize:14 }}>{acc.name}</span>
+                {acc.found ? (
+                  <span style={{ fontSize:11, fontWeight:700, padding:'2px 10px', borderRadius:20, background:ss.bg, color:ss.color }}>
+                    {acc.status}
+                  </span>
+                ) : (
+                  <span style={{ fontSize:11, fontWeight:700, padding:'2px 10px', borderRadius:20, background:'#f3f4f6', color:'#6b7280' }}>
+                    미등록
+                  </span>
+                )}
+              </div>
+
+              {acc.found ? (
+                <div style={{ padding:'16px' }}>
+                  {/* 성과 지표 */}
+                  <div style={{ display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:10, marginBottom:14 }}>
+                    <AdMetric label="노출수"   value={acc.impCnt != null ? fmtN(acc.impCnt) : '-'} />
+                    <AdMetric label="클릭수"   value={acc.clkCnt != null ? fmtN(acc.clkCnt) : '-'} />
+                    <AdMetric label="내 CTR"   value={acc.ctr    != null ? `${acc.ctr}%` : '-'} highlight />
+                    <AdMetric label="평균CPC"  value={acc.avgCpc  != null ? `${Number(acc.avgCpc).toLocaleString()}원` : '-'} />
+                    <AdMetric label="광고비"   value={acc.salesAmt != null ? `${Number(acc.salesAmt).toLocaleString()}원` : '-'} />
+                    <AdMetric label="입찰가"   value={acc.bid      != null ? `${Number(acc.bid).toLocaleString()}원` : '-'} />
+                  </div>
+
+                  {/* 시장 대비 평가 */}
+                  {cs && (
+                    <div style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 12px', background:cs.bg, borderRadius:8 }}>
+                      <span style={{ fontSize:13, fontWeight:800, color:cs.color }}>{cs.label}</span>
+                      {acc.ctrDiff !== null && (
+                        <span style={{ fontSize:11, color:cs.color }}>
+                          시장 평균 대비 CTR {acc.ctrDiff > 0 ? '+' : ''}{acc.ctrDiff}%p
+                        </span>
+                      )}
+                    </div>
+                  )}
+                  {!cs && market && acc.ctr !== null && (
+                    <div style={{ fontSize:11, color:'var(--color-text-muted)', marginTop:6 }}>시장 평균 CTR 비교 불가 (데이터 없음)</div>
+                  )}
+                </div>
+              ) : (
+                <div style={{ padding:'24px 16px', textAlign:'center', color:'#9ca3af', fontSize:13 }}>
+                  이 계정에 해당 키워드 광고가 없습니다
+                  <br/><span style={{ fontSize:11 }}>네이버 검색광고에서 키워드를 등록하면 성과가 표시됩니다</span>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      <p style={{ marginTop:16, fontSize:11, color:'var(--color-text-muted)', padding:'8px 12px', background:'#f8fafc', borderRadius:6 }}>
+        ℹ️ 노출·클릭·CTR은 최근 30일 기준 / 입찰가·상태는 현재 설정값
+      </p>
+    </div>
+  );
+}
+
+function AdStat({ label, value, color }) {
+  return (
+    <div style={{ textAlign:'center', minWidth:80 }}>
+      <div style={{ fontSize:15, fontWeight:800, color }}>{value}</div>
+      <div style={{ fontSize:10, color:'var(--color-text-sub)', marginTop:2 }}>{label}</div>
+    </div>
+  );
+}
+
+function AdMetric({ label, value, highlight }) {
+  return (
+    <div style={{ textAlign:'center', padding:'8px 4px', background:'#f8fafc', borderRadius:8 }}>
+      <div style={{ fontSize:14, fontWeight:700, color: highlight ? 'var(--color-primary)' : 'var(--color-text)' }}>{value}</div>
+      <div style={{ fontSize:10, color:'var(--color-text-sub)', marginTop:2 }}>{label}</div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════
    상세 패널 (연관키워드 / 트렌드 / 성향분석)
 ══════════════════════════════════════════════ */
 function DetailPanel({ keyword, totalSearch }) {
@@ -109,6 +269,7 @@ function DetailPanel({ keyword, totalSearch }) {
     { key: 'related', label: '🔗 연관 키워드' },
     { key: 'trend',   label: '📈 트렌드' },
     { key: 'click',   label: '🖱 클릭 분석' },
+    { key: 'myad',    label: '🏆 내 광고 성과' },
   ];
 
   return (
@@ -313,6 +474,11 @@ function DetailPanel({ keyword, totalSearch }) {
                 </div>
               );
             })()}
+
+            {/* ── 내 광고 성과 ── */}
+            {tab === 'myad' && (
+              <MyAdPanel keyword={keyword} />
+            )}
 
             {/* ── 클릭 분석 ── */}
             {tab === 'click' && (
