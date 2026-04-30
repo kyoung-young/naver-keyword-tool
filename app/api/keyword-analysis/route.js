@@ -36,19 +36,21 @@ async function getPublishCount(keyword, channel, clientId, clientSecret) {
     const items = data.items ?? [];
 
     // 날짜 범위로 월간 발행량 추정
-    // ※ 카페 API의 postdate는 "YYYYMMDD" 형식 → new Date()가 Invalid Date를 반환하므로 직접 파싱
+    // ※ 블로그: pubDate  "Mon, 09 Jan 2023 15:30:00 +0900"
+    // ※ 카페:  postdate "20230109"  → new Date() Invalid Date 주의
     const dated = items
       .map(i => {
-        let raw = i.pubDate || '';
-        if (!raw && i.postdate) {
-          // "20230109" → "2023-01-09"
-          const s = String(i.postdate);
-          raw = s.length === 8
-            ? `${s.slice(0,4)}-${s.slice(4,6)}-${s.slice(6,8)}`
-            : s;
+        // pubDate, postdate 모두 시도 — YYYYMMDD 형식이면 변환
+        for (const field of [i.pubDate, i.postdate]) {
+          if (!field) continue;
+          let raw = String(field).trim();
+          if (/^\d{8}$/.test(raw)) {
+            raw = `${raw.slice(0,4)}-${raw.slice(4,6)}-${raw.slice(6,8)}`;
+          }
+          const t = new Date(raw).getTime();
+          if (!isNaN(t)) return t;
         }
-        const t = new Date(raw).getTime();
-        return isNaN(t) ? null : t;
+        return null;
       })
       .filter(Boolean)
       .sort((a, b) => b - a); // 최신순

@@ -92,11 +92,12 @@ function MyAdPanel({ keyword }) {
   const [error,   setError]   = useState('');
   const [saving,  setSaving]  = useState(false);
   // 등록 폼 상태
-  const [formAccount, setFormAccount] = useState('');
-  const [formBid,     setFormBid]     = useState('');
-  const [formStatus,  setFormStatus]  = useState('운영중');
-  const [formMemo,    setFormMemo]    = useState('');
-  const [showForm,    setShowForm]    = useState(false);
+  const [formAccount,   setFormAccount]   = useState('');
+  const [formBidPc,     setFormBidPc]     = useState('');
+  const [formBidMobile, setFormBidMobile] = useState('');
+  const [formStatus,    setFormStatus]    = useState('운영중');
+  const [formMemo,      setFormMemo]      = useState('');
+  const [showForm,      setShowForm]      = useState(false);
 
   const load = () => {
     setLoading(true);
@@ -122,15 +123,16 @@ function MyAdPanel({ keyword }) {
         body: JSON.stringify({
           accountName: formAccount,
           keyword,
-          bidAmt:  formBid ? Number(formBid) : null,
-          status:  formStatus,
-          memo:    formMemo,
+          bidPc:     formBidPc     ? Number(formBidPc)     : null,
+          bidMobile: formBidMobile ? Number(formBidMobile) : null,
+          status:    formStatus,
+          memo:      formMemo,
         }),
       });
       const j = await res.json();
       if (!res.ok) throw new Error(j.error);
       setShowForm(false);
-      setFormBid(''); setFormMemo(''); setFormStatus('운영중');
+      setFormBidPc(''); setFormBidMobile(''); setFormMemo(''); setFormStatus('운영중');
       load();
     } catch(e) { setError(e.message); }
     finally { setSaving(false); }
@@ -209,8 +211,13 @@ function MyAdPanel({ keyword }) {
                 </select>
               </div>
               <div>
-                <label style={{ fontSize:11, fontWeight:700, display:'block', marginBottom:4 }}>입찰가 (원)</label>
-                <input type="number" value={formBid} onChange={e => setFormBid(e.target.value)} placeholder="예: 500"
+                <label style={{ fontSize:11, fontWeight:700, display:'block', marginBottom:4 }}>🖥 PC 입찰가 (원)</label>
+                <input type="number" value={formBidPc} onChange={e => setFormBidPc(e.target.value)} placeholder="예: 500"
+                  style={{ width:'100%', padding:'6px 10px', border:'1px solid var(--color-border)', borderRadius:6, fontSize:13 }} />
+              </div>
+              <div>
+                <label style={{ fontSize:11, fontWeight:700, display:'block', marginBottom:4 }}>📱 모바일 입찰가 (원)</label>
+                <input type="number" value={formBidMobile} onChange={e => setFormBidMobile(e.target.value)} placeholder="예: 300"
                   style={{ width:'100%', padding:'6px 10px', border:'1px solid var(--color-border)', borderRadius:6, fontSize:13 }} />
               </div>
               <div>
@@ -218,6 +225,7 @@ function MyAdPanel({ keyword }) {
                 <input type="text" value={formMemo} onChange={e => setFormMemo(e.target.value)} placeholder="선택 입력"
                   style={{ width:'100%', padding:'6px 10px', border:'1px solid var(--color-border)', borderRadius:6, fontSize:13 }} />
               </div>
+              <div />
             </div>
             <button type="submit" className="btn btn-primary" style={{ fontSize:12 }} disabled={saving}>
               {saving ? '저장 중…' : '💾 저장'}
@@ -246,13 +254,21 @@ function MyAdPanel({ keyword }) {
                     </div>
                   </div>
                   {/* 수치 */}
-                  <div style={{ padding:'12px 14px', display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
-                    <AdMetric label="입찰가" value={row.bid_amt != null ? `${Number(row.bid_amt).toLocaleString()}원` : '-'} />
+                  <div style={{ padding:'12px 14px' }}>
+                    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:8 }}>
+                      <AdMetric label="🖥 PC 입찰가"
+                        value={row.bid_pc != null ? `${Number(row.bid_pc).toLocaleString()}원` : '-'} />
+                      <AdMetric label="📱 모바일 입찰가"
+                        value={row.bid_mobile != null ? `${Number(row.bid_mobile).toLocaleString()}원` : '-'} />
+                    </div>
                     {market && (
-                      <AdMetric label="시장 PC CTR" value={market.marketPcCtr != null ? `${market.marketPcCtr}%` : '-'} highlight />
+                      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, padding:'8px', background:'#f0f9ff', borderRadius:8, marginBottom:6 }}>
+                        <AdMetric label="시장 PC CTR"    value={market.marketPcCtr  != null ? `${market.marketPcCtr}%`  : '-'} highlight />
+                        <AdMetric label="시장 모바일CTR" value={market.marketMobCtr != null ? `${market.marketMobCtr}%` : '-'} highlight />
+                      </div>
                     )}
                     {row.memo && (
-                      <div style={{ gridColumn:'1/-1', fontSize:11, color:'var(--color-text-sub)', marginTop:4 }}>
+                      <div style={{ fontSize:11, color:'var(--color-text-sub)', marginTop:4 }}>
                         💬 {row.memo}
                       </div>
                     )}
