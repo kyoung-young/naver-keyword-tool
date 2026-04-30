@@ -5,6 +5,7 @@
 
 import { NextResponse } from 'next/server';
 import { getKeywordTool } from '../../../lib/naverSearchAd';
+import { saveKeywordStats } from '../../../lib/keywordHistory';
 
 export const runtime = 'nodejs';
 
@@ -163,6 +164,16 @@ export async function POST(request) {
         blogSatLevel: null, cafeSatLevel: null, totalSatLevel: null,
       }
     );
+
+    // 검색광고 API 데이터가 있는 결과만 DB에 백그라운드 저장 (응답 지연 없음)
+    if (hasAdApi) {
+      for (const r of results) {
+        if (r.pcSearch !== null) {
+          saveKeywordStats(r.keyword, r.pcSearch, r.mobileSearch, r.competition)
+            .catch(e => console.error('[keyword-analysis] DB save error:', e.message));
+        }
+      }
+    }
 
     return NextResponse.json({ results, hasAdApi });
   } catch (err) {

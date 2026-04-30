@@ -6,6 +6,7 @@
 import { NextResponse } from 'next/server';
 import { getKeywordTool } from '../../../lib/naverSearchAd';
 import { getKeywordDemographics } from '../../../lib/naverDemographic';
+import { getKeywordHistory } from '../../../lib/keywordHistory';
 
 export const runtime = 'nodejs';
 
@@ -70,11 +71,15 @@ export async function POST(request) {
       avgDepth:     exact.plAvgDepth             ?? null,
     } : null;
 
+    // DB에서 월별 히스토리 조회 (없으면 빈 배열)
+    const history = await getKeywordHistory(keyword);
+
     return NextResponse.json({
       keyword,
       relatedKeywords,
       trendData:  demo.trendData ?? [],
       mainStats,
+      history,   // [{year_month, pc_cnt, mobile_cnt, total_cnt}]
       hasAdApi,
     });
   } catch (err) {

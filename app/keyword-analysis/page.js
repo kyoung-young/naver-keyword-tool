@@ -189,85 +189,122 @@ function DetailPanel({ keyword, totalSearch }) {
 
             {/* ── 트렌드 ── */}
             {tab === 'trend' && (() => {
-              const td = data.trendData ?? [];
-              // ratio > 0 인 데이터가 하나라도 있어야 실제 트렌드 존재
-              const hasRealData = td.length > 0 && td.some(d => (d.ratio ?? 0) > 0);
-              const maxRatio    = hasRealData ? Math.max(...td.map(d => d.ratio ?? 0)) : 1;
+              const hist = data.history ?? [];           // DB 히스토리 (월별 실제 데이터)
+              const td   = data.trendData ?? [];         // DataLab 상대지수 (보조)
+              const hasHistory = hist.length >= 2;       // 2개월 이상 = 실제 차트 표시
+              const hasDataLab = td.length > 0 && td.some(d => (d.ratio ?? 0) > 0);
 
-              // DataLab 상대지수 → 추정 월별 검색량 변환
-              // estimated[i] = totalSearch × ratio[i] / maxRatio
-              // (현재월 검색량 기준으로 스케일링)
-              const canConvert = hasRealData && totalSearch && totalSearch > 0;
-              const chartItems = td.map(d => ({
-                period:    d.period,
-                ratio:     d.ratio ?? 0,
-                estimated: canConvert ? Math.round(totalSearch * (d.ratio ?? 0) / maxRatio) : null,
-              }));
-              const maxVal = canConvert
-                ? Math.max(...chartItems.map(c => c.estimated), 1)
-                : maxRatio;
+              /* ── A. DB 히스토리 차트 (실제 월별 검색량) ── */
+              if (hasHistory) {
+                const pcMax  = Math.max(...hist.map(h => h.pc_cnt),     1);
+                const mobMax = Math.max(...hist.map(h => h.mobile_cnt), 1);
+                const maxVal = Math.max(pcMax, mobMax, 1);
+
+                return (
+                  <div>
+                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
+                      <p style={{ fontSize:12, color:'var(--color-text-sub)' }}>
+                        월별 실제 검색량 ({hist.length}개월 누적)
+                      </p>
+                      <div style={{ display:'flex', gap:12, fontSize:11 }}>
+                        <span style={{ display:'flex', alignItems:'center', gap:4 }}>
+                          <span style={{ width:10, height:10, borderRadius:2, background:'#3b82f6', display:'inline-block' }}/>PC
+                        </span>
+                        <span style={{ display:'flex', alignItems:'center', gap:4 }}>
+                          <span style={{ width:10, height:10, borderRadius:2, background:'#10b981', display:'inline-block' }}/>모바일
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Y축 + 차트 */}
+                    <div style={{ position:'relative', paddingLeft:50 }}>
+                      {[1, 0.75, 0.5, 0.25, 0].map(frac => (
+                        <div key={frac} style={{ position:'absolute', left:0, top:`${(1-frac)*100}%`, width:46, textAlign:'right', fontSize:9, color:'#9ca3af', transform:'translateY(-50%)', lineHeight:1 }}>
+                          {Number(Math.round(maxVal * frac)).toLocaleString()}
+                        </div>
+                      ))}
+                      <div style={{ display:'flex', alignItems:'flex-end', gap:4, height:150, borderBottom:'1px solid #e5e7eb', borderLeft:'1px solid #e5e7eb', paddingBottom:0 }}>
+                        {hist.map((h, i) => {
+                          const pcH  = Math.max(h.pc_cnt     / maxVal * 100, 0);
+                          const mobH = Math.max(h.mobile_cnt / maxVal * 100, 0);
+                          return (
+                            <div key={i} style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:2, cursor:'default' }}>
+                              {/* PC + 모바일 막대 나란히 */}
+                              <div style={{ width:'100%', display:'flex', alignItems:'flex-end', gap:1, height:140 }}>
+                                <div title={`${h.year_month} PC: ${Number(h.pc_cnt).toLocaleString()}건`}
+                                  style={{ flex:1, background:'#3b82f6', borderRadius:'2px 2px 0 0', height:`${pcH}%`, minHeight: pcH>0?2:0, opacity:0.8 }}
+                                  onMouseEnter={e=>e.currentTarget.style.opacity='1'}
+                                  onMouseLeave={e=>e.currentTarget.style.opacity='0.8'} />
+                                <div title={`${h.year_month} 모바일: ${Number(h.mobile_cnt).toLocaleString()}건`}
+                                  style={{ flex:1, background:'#10b981', borderRadius:'2px 2px 0 0', height:`${mobH}%`, minHeight: mobH>0?2:0, opacity:0.8 }}
+                                  onMouseEnter={e=>e.currentTarget.style.opacity='1'}
+                                  onMouseLeave={e=>e.currentTarget.style.opacity='0.8'} />
+                              </div>
+                              <span style={{ fontSize:8, color:'#9ca3af', writingMode:'vertical-rl', transform:'rotate(180deg)', height:28, overflow:'hidden' }}>
+                                {h.year_month?.slice(2)}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* 요약 */}
+                    <div style={{ display:'flex', flexWrap:'wrap', gap:16, marginTop:12, fontSize:11, color:'var(--color-text-sub)' }}>
+                      <span>📅 {hist[0]?.year_month} ~ {hist[hist.length-1]?.year_month}</span>
+                      <span>🖥 PC 최고 <strong style={{ color:'#3b82f6' }}>{Number(Math.max(...hist.map(h=>h.pc_cnt))).toLocaleString()}건</strong></span>
+                      <span>📱 모바일 최고 <strong style={{ color:'#10b981' }}>{Number(Math.max(...hist.map(h=>h.mobile_cnt))).toLocaleString()}건</strong></span>
+                    </div>
+                  </div>
+                );
+              }
+
+              /* ── B. DataLab 근사치 (DB 데이터 부족할 때) ── */
+              const canConvert = hasDataLab && totalSearch && totalSearch > 0;
+              const maxRatio   = hasDataLab ? Math.max(...td.map(d => d.ratio ?? 0)) : 1;
 
               return (
                 <div>
-                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
-                    <p style={{ fontSize:12, color:'var(--color-text-sub)' }}>
-                      최근 12개월 월별 검색량 추이
+                  {/* 수집 진행 상태 */}
+                  <div style={{ padding:'10px 14px', background:'#eff6ff', border:'1px solid #bfdbfe', borderRadius:8, marginBottom:16, fontSize:12 }}>
+                    <strong style={{ color:'#1d4ed8' }}>📊 데이터 수집 중 {hist.length}/12개월</strong>
+                    <p style={{ marginTop:4, color:'#3b82f6', fontSize:11 }}>
+                      키워드 분석을 실행할 때마다 자동 저장됩니다.<br/>
+                      2개월 이상 쌓이면 실제 PC·모바일 검색량 그래프가 표시됩니다.
                     </p>
-                    {canConvert && (
-                      <span style={{ fontSize:10, color:'var(--color-text-muted)', padding:'2px 8px', background:'#f1f5f9', borderRadius:4 }}>
-                        DataLab 상대지수 × 현재월 검색량 기반 추정치
-                      </span>
+                    {hist.length === 1 && (
+                      <p style={{ marginTop:6, fontSize:11, color:'#1d4ed8' }}>
+                        현재 저장: {hist[0].year_month} — PC {Number(hist[0].pc_cnt).toLocaleString()}건 / 모바일 {Number(hist[0].mobile_cnt).toLocaleString()}건
+                      </p>
                     )}
                   </div>
 
-                  {hasRealData ? (
+                  {/* DataLab 근사치 (있으면) */}
+                  {canConvert ? (
                     <>
-                      {/* 차트 영역 */}
-                      <div style={{ position:'relative', paddingLeft:52 }}>
-                        {/* Y축 눈금 */}
-                        {canConvert && [1, 0.75, 0.5, 0.25, 0].map(frac => (
-                          <div key={frac} style={{ position:'absolute', left:0, top:`${(1-frac)*100}%`, width:44, textAlign:'right', fontSize:9, color:'#9ca3af', transform:'translateY(-50%)' }}>
-                            {fmtN(Math.round(maxVal * frac))}
-                          </div>
-                        ))}
-                        {/* 막대 그래프 */}
-                        <div style={{ display:'flex', alignItems:'flex-end', gap:3, height:140, borderBottom:'1px solid #e5e7eb', borderLeft:'1px solid #e5e7eb' }}>
-                          {chartItems.map((c, i) => {
-                            const val = canConvert ? c.estimated : c.ratio;
-                            const pct = Math.max(val / maxVal * 100, 0);
-                            return (
-                              <div key={i} title={`${c.period?.slice(0,7)}: ${canConvert ? fmtN(c.estimated)+'건' : c.ratio}`}
-                                style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:2, cursor:'default' }}>
-                                <div style={{ width:'100%', background:'var(--color-primary)', borderRadius:'2px 2px 0 0', height:`${pct}%`, minHeight: pct > 0 ? 3 : 0, opacity:0.75, transition:'opacity .2s' }}
-                                  onMouseEnter={e => e.currentTarget.style.opacity='1'}
-                                  onMouseLeave={e => e.currentTarget.style.opacity='0.75'} />
-                                <span style={{ fontSize:8, color:'#9ca3af', writingMode:'vertical-rl', transform:'rotate(180deg)', height:32, overflow:'hidden' }}>
-                                  {c.period?.slice(2,7)}
-                                </span>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                      {/* 요약 */}
-                      <div style={{ display:'flex', gap:20, marginTop:12, fontSize:11, color:'var(--color-text-sub)' }}>
-                        <span>📅 기간: {td[0]?.period?.slice(0,7)} ~ {td[td.length-1]?.period?.slice(0,7)}</span>
-                        {canConvert && (
-                          <>
-                            <span>📈 최고: <strong style={{ color:'var(--color-primary)' }}>{fmtN(Math.max(...chartItems.map(c=>c.estimated)))}건</strong></span>
-                            <span>📉 최저: <strong>{fmtN(Math.min(...chartItems.map(c=>c.estimated)))}건</strong></span>
-                          </>
-                        )}
+                      <p style={{ fontSize:11, color:'var(--color-text-muted)', marginBottom:10 }}>
+                        ※ 현재는 DataLab 상대지수 기반 추정치 표시 (정확도 낮음)
+                      </p>
+                      <div style={{ display:'flex', alignItems:'flex-end', gap:3, height:100, borderBottom:'1px solid #e5e7eb' }}>
+                        {td.map((d, i) => {
+                          const pct = Math.max((d.ratio ?? 0) / maxRatio * 100, 0);
+                          const est = Math.round(totalSearch * (d.ratio ?? 0) / maxRatio);
+                          return (
+                            <div key={i} title={`${d.period?.slice(0,7)}: 약 ${Number(est).toLocaleString()}건`}
+                              style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:2 }}>
+                              <div style={{ width:'100%', background:'#94a3b8', borderRadius:'2px 2px 0 0', height:`${pct}%`, minHeight: pct>0?2:0 }} />
+                              <span style={{ fontSize:7, color:'#9ca3af', writingMode:'vertical-rl', transform:'rotate(180deg)', height:24 }}>
+                                {d.period?.slice(2,7)}
+                              </span>
+                            </div>
+                          );
+                        })}
                       </div>
                     </>
                   ) : (
-                    <div style={{ textAlign:'center', padding:'32px 0', background:'#f8fafc', borderRadius:8 }}>
-                      <p style={{ fontSize:13, color:'var(--color-text-sub)' }}>📉 트렌드 데이터 없음</p>
-                      <p style={{ fontSize:11, color:'var(--color-text-muted)', marginTop:8, lineHeight:1.7 }}>
-                        네이버 DataLab은 월 검색량이 일정 기준 이상인 키워드만 제공합니다.<br/>
-                        이 키워드는 검색량이 낮아 DataLab 트렌드 데이터를 제공받지 못했습니다.<br/>
-                        <span style={{ color:'var(--color-primary)' }}>현재월 검색량: {fmtN(totalSearch)}건</span>
-                      </p>
+                    <div style={{ textAlign:'center', padding:'20px 0', color:'var(--color-text-muted)', fontSize:12 }}>
+                      현재월 검색량: <strong style={{ color:'var(--color-primary)' }}>{fmtN(totalSearch)}건</strong>
+                      <br/><span style={{ fontSize:11 }}>(DataLab 임계값 미달 — 수집 데이터 누적 시 그래프 표시)</span>
                     </div>
                   )}
                 </div>
