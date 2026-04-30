@@ -54,7 +54,6 @@ function satColor(pct) {
 }
 function satLabel(pct) {
   if (pct === null || pct === undefined) return '-';
-  if (pct === 0) return '데이터 없음';
   if (pct < 10)  return '매우 낮음';
   if (pct < 30)  return '낮음';
   if (pct < 50)  return '높음';
@@ -659,7 +658,7 @@ function KeywordCard({ r, defaultOpen = false }) {
             <MetricItem icon="📝" label="블로그" value={`${fmtN(r.blogMonthly)}+`} highlight />
             <MetricItem icon="☕" label="카페"   value={`${fmtN(r.cafeMonthly)}+`} highlight />
           </div>
-          <p style={{ marginTop:10, fontSize:10, color:'var(--color-text-muted)' }}>* 최근 100건 날짜 범위 기반 추정치</p>
+          <p style={{ marginTop:10, fontSize:10, color:'var(--color-text-muted)' }}>* 블로그: 최근 100건 날짜 범위 기반 / 카페: 누적÷60개월 추정</p>
         </div>
 
         {/* 콘텐츠 포화도 지수 */}

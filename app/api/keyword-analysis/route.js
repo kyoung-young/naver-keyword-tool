@@ -36,18 +36,15 @@ async function getPublishCount(keyword, channel, clientId, clientSecret) {
     const items = data.items ?? [];
 
     // 날짜 범위로 월간 발행량 추정
-    // ※ 블로그 pubDate : "Mon, 09 Jan 2023 15:30:00 +0900"  → new Date() 바로 파싱 가능
-    // ※ 카페 postdate : "20230109" 또는 pubDate: "2023.01.09"  → 직접 변환 필요
+    // ※ 블로그: pubDate "Mon, 09 Jan 2023 15:30:00 +0900" → 날짜 파싱 가능
+    // ※ 카페: 날짜 필드 없음 (cafearticle API 미제공) → total/60 으로 추정
     const parseDate = (raw) => {
       if (!raw) return NaN;
       const s = String(raw).trim();
-      // YYYYMMDD
       if (/^\d{8}$/.test(s))
         return new Date(`${s.slice(0,4)}-${s.slice(4,6)}-${s.slice(6,8)}`).getTime();
-      // YYYY.MM.DD
       if (/^\d{4}\.\d{2}\.\d{2}$/.test(s))
         return new Date(s.replace(/\./g, '-')).getTime();
-      // YYYY-MM-DD 또는 RFC 2822 등 나머지
       return new Date(s).getTime();
     };
 
@@ -60,18 +57,19 @@ async function getPublishCount(keyword, channel, clientId, clientSecret) {
         return null;
       })
       .filter(Boolean)
-      .sort((a, b) => b - a); // 최신순
+      .sort((a, b) => b - a);
 
     let monthly = 0;
     if (dated.length >= 2) {
-      const newest = dated[0];
-      const oldest = dated[dated.length - 1];
-      const daySpan = (newest - oldest) / 86400000; // ms → days
+      const daySpan = (dated[0] - dated[dated.length - 1]) / 86400000;
       monthly = daySpan > 0
         ? Math.round(dated.length / daySpan * 30)
-        : dated.length * 30; // 같은 날 몰려있으면 매우 활발
+        : dated.length * 30;
     } else if (dated.length === 1) {
-      monthly = 30; // 최소 추정
+      monthly = 30;
+    } else if (total > 0) {
+      // 날짜 필드 없음(카페 등) → 누적 총수 ÷ 60개월(5년) 으로 추정
+      monthly = Math.round(total / 60);
     }
 
     return { total, monthly };
