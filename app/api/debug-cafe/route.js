@@ -10,6 +10,13 @@ export async function GET(request) {
     headers: { 'X-Naver-Client-Id': clientId, 'X-Naver-Client-Secret': clientSecret }
   });
   const data = await res.json();
-  const items = (data.items ?? []).map(i => ({ pubDate: i.pubDate, postdate: i.postdate, title: i.title?.slice(0,30) }));
-  return NextResponse.json({ total: data.total, items });
+  // 첫 번째 아이템의 모든 키 확인
+  const firstItem = data.items?.[0] ?? null;
+  const allKeys = firstItem ? Object.keys(firstItem) : [];
+  const sample = (data.items ?? []).slice(0,3).map(i => {
+    const out = {};
+    for (const k of Object.keys(i)) out[k] = String(i[k]).slice(0, 50);
+    return out;
+  });
+  return NextResponse.json({ total: data.total, allKeys, sample });
 }
