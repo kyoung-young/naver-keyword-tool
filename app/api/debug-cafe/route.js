@@ -1,22 +1,18 @@
 import { NextResponse } from 'next/server';
 export const runtime = 'nodejs';
 export async function GET(request) {
-  const { searchParams } = new URL(request.url);
-  const kw = searchParams.get('kw') || '만화카페창업';
-  const clientId = process.env.NAVER_CLIENT_ID;
+  const clientId     = process.env.NAVER_CLIENT_ID;
   const clientSecret = process.env.NAVER_CLIENT_SECRET;
-  const params = new URLSearchParams({ query: kw, display: '5', sort: 'date' });
-  const res = await fetch(`https://openapi.naver.com/v1/search/cafearticle.json?${params}`, {
+  const params = new URLSearchParams({ query: '만화카페창업', display: '3', sort: 'date' });
+  const res  = await fetch(`https://openapi.naver.com/v1/search/cafearticle.json?${params}`, {
     headers: { 'X-Naver-Client-Id': clientId, 'X-Naver-Client-Secret': clientSecret }
   });
   const data = await res.json();
-  // 첫 번째 아이템의 모든 키 확인
-  const firstItem = data.items?.[0] ?? null;
-  const allKeys = firstItem ? Object.keys(firstItem) : [];
-  const sample = (data.items ?? []).slice(0,3).map(i => {
-    const out = {};
-    for (const k of Object.keys(i)) out[k] = String(i[k]).slice(0, 50);
-    return out;
+  // 첫 번째 아이템 raw 그대로 반환 (날짜 필드 확인용)
+  return NextResponse.json({
+    httpStatus: res.status,
+    total: data.total,
+    firstItemRaw: data.items?.[0] ?? null,
+    firstItemKeys: data.items?.[0] ? Object.keys(data.items[0]) : [],
   });
-  return NextResponse.json({ total: data.total, allKeys, sample });
 }
