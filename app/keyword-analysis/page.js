@@ -82,50 +82,80 @@ function Sparkline({ data, color = '#03c75a', w = 120, h = 36 }) {
 }
 
 /* ══════════════════════════════════════════════
-   내 광고 성과 패널
+   내 광고 성과 패널 — 수동 등록 + 시장 평균 비교
 ══════════════════════════════════════════════ */
-function MyAdPanel({ keyword }) {
-  const [data, setData]       = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError]     = useState('');
+const STATUS_OPTIONS = ['운영중', '중지', '예산소진', '검토중'];
 
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true); setData(null); setError('');
-    fetch('/api/ad-comparison', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ keywords: [keyword] }),
-    })
-      .then(r => r.json().then(j => ({ ok: r.ok, j })))
-      .then(({ ok, j }) => { if (!cancelled) { if (!ok) throw new Error(j.error); setData(j); } })
-      .catch(e => { if (!cancelled) setError(e.message); })
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
-  }, [keyword]);
+function MyAdPanel({ keyword }) {
+  const [data,    setData]    = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error,   setError]   = useState('');
+  const [saving,  setSaving]  = useState(false);
+  // 등록 폼 상태
+  const [formAccount, setFormAccount] = useState('');
+  const [formBid,     setFormBid]     = useState('');
+  const [formStatus,  setFormStatus]  = useState('운영중');
+  const [formMemo,    setFormMemo]    = useState('');
+  const [showForm,    setShowForm]    = useState(false);
+
+  const load = () => {
+    setLoading(true);
+    fetch(`/api/my-keywords?account=`)
+      .then(r => r.json())
+      .then(j => {
+        setData(j);
+        if (!formAccount && j.accountNames?.length) setFormAccount(j.accountNames[0]);
+      })
+      .catch(e => setError(e.message))
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => { load(); }, [keyword]);
+
+  const handleRegister = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      const res = await fetch('/api/my-keywords', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          accountName: formAccount,
+          keyword,
+          bidAmt:  formBid ? Number(formBid) : null,
+          status:  formStatus,
+          memo:    formMemo,
+        }),
+      });
+      const j = await res.json();
+      if (!res.ok) throw new Error(j.error);
+      setShowForm(false);
+      setFormBid(''); setFormMemo(''); setFormStatus('운영중');
+      load();
+    } catch(e) { setError(e.message); }
+    finally { setSaving(false); }
+  };
+
+  const handleDelete = async (id) => {
+    if (!confirm('이 항목을 삭제하시겠습니까?')) return;
+    await fetch(`/api/my-keywords?id=${id}`, { method: 'DELETE' });
+    load();
+  };
 
   if (loading) return (
-    <div style={{ textAlign:'center', padding:'32px 0' }}>
-      <span className="spinner" style={{ width:24, height:24 }} />
-      <p style={{ marginTop:10, color:'var(--color-text-sub)', fontSize:13 }}>광고 계정 데이터 조회 중…</p>
+    <div style={{ textAlign:'center', padding:'24px 0' }}>
+      <span className="spinner" style={{ width:20, height:20 }} />
     </div>
   );
-  if (error) return (
-    <div style={{ padding:'12px 16px', background:'#fef2f2', borderRadius:8, color:'#dc2626', fontSize:13 }}>
-      ❌ {error}
-    </div>
+
+  // 이 키워드에 대한 등록 항목만 필터
+  const myRows = (data?.keywords ?? []).filter(
+    r => r.keyword.toLowerCase() === keyword.toLowerCase()
   );
-  if (!data) return null;
+  const accountNames = data?.accountNames ?? [];
 
-  const row    = data.comparison?.[0];
-  const market = row?.market ?? null;
-  const accounts = row?.accounts ?? [];
-
-  const ctrScoreStyle = (score) => ({
-    good: { color:'#16a34a', bg:'#dcfce7', label:'▲ 시장 상회' },
-    avg:  { color:'#d97706', bg:'#fef9c3', label:'→ 시장 평균' },
-    bad:  { color:'#dc2626', bg:'#fee2e2', label:'▼ 시장 하회' },
-  }[score] ?? { color:'#9ca3af', bg:'#f3f4f6', label:'-' });
+  // 시장 평균은 첫 번째 등록된 row의 market 사용 (또는 별도 조회)
+  const market = myRows[0]?.market ?? null;
 
   const statusStyle = (s) =>
     s === '운영중'  ? { color:'#16a34a', bg:'#dcfce7' } :
@@ -135,89 +165,107 @@ function MyAdPanel({ keyword }) {
 
   return (
     <div>
-      <p style={{ fontSize:12, color:'var(--color-text-sub)', marginBottom:20 }}>
-        등록된 광고 계정의 최근 30일 성과 vs 시장 평균 (keywordstool 기준)
-      </p>
+      {error && <div style={{ marginBottom:12, padding:'8px 12px', background:'#fef2f2', borderRadius:8, color:'#dc2626', fontSize:12 }}>❌ {error}</div>}
 
-      {/* 시장 평균 기준값 */}
+      {/* 시장 평균 기준 */}
       {market && (
-        <div style={{ display:'flex', gap:12, flexWrap:'wrap', marginBottom:20, padding:'12px 16px', background:'#f8fafc', borderRadius:10, border:'1px solid #e5e7eb' }}>
-          <span style={{ fontSize:11, fontWeight:700, color:'var(--color-text-sub)', width:'100%', marginBottom:4 }}>📊 시장 평균 (keywordstool)</span>
-          <AdStat label="월 검색량"    value={fmtN(market.totalSearch) + '건'} color="#6366f1" />
-          <AdStat label="PC CTR"       value={market.marketPcCtr  != null ? `${market.marketPcCtr}%`  : '-'} color="#3b82f6" />
-          <AdStat label="모바일 CTR"   value={market.marketMobCtr != null ? `${market.marketMobCtr}%` : '-'} color="#10b981" />
-          <AdStat label="PC 월평균클릭" value={market.marketPcClk  != null ? fmtN(Math.round(market.marketPcClk)) + '회' : '-'} color="#f59e0b" />
-          <AdStat label="평균 노출순위" value={market.marketAvgDepth != null ? `${market.marketAvgDepth}위` : '-'} color="#ef4444" />
+        <div style={{ display:'flex', gap:16, flexWrap:'wrap', marginBottom:20, padding:'12px 16px', background:'#f0f9ff', borderRadius:10, border:'1px solid #bae6fd' }}>
+          <span style={{ fontSize:11, fontWeight:700, color:'#0369a1', width:'100%' }}>📊 시장 평균 (네이버 keywordstool 기준)</span>
+          <AdStat label="월 검색량"     value={fmtN(market.totalSearch)+'건'}                                            color="#6366f1" />
+          <AdStat label="PC CTR"        value={market.marketPcCtr  != null ? `${market.marketPcCtr}%`  : '-'}            color="#3b82f6" />
+          <AdStat label="모바일 CTR"    value={market.marketMobCtr != null ? `${market.marketMobCtr}%` : '-'}            color="#10b981" />
+          <AdStat label="PC 월평균클릭" value={market.marketPcClk  != null ? fmtN(Math.round(market.marketPcClk))+'회' : '-'} color="#f59e0b" />
+          <AdStat label="평균노출순위"  value={market.marketAvgDepth != null ? `${market.marketAvgDepth}위` : '-'}       color="#ef4444" />
+          <AdStat label="경쟁강도"      value={market.compIdx ? { low:'낮음', mid:'중간', high:'높음' }[market.compIdx] ?? market.compIdx : '-'} color="#8b5cf6" />
         </div>
       )}
 
-      {/* 계정별 성과 */}
-      {accounts.length === 0 && (
-        <div style={{ padding:'14px 16px', background:'#fffbeb', border:'1px solid #fde68a', borderRadius:8, fontSize:13, color:'#92400e' }}>
-          ⚠️ 등록된 광고 계정이 없습니다. Railway 환경변수에 NAVER_AD_ACCOUNT_NAME_2 등을 설정해주세요.
+      {/* 등록된 계정별 운영 현황 */}
+      <div style={{ marginBottom:16 }}>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
+          <span style={{ fontWeight:700, fontSize:13 }}>🏢 계정별 운영 현황</span>
+          <button className="btn btn-primary" style={{ fontSize:12, padding:'5px 12px' }}
+            onClick={() => setShowForm(v => !v)}>
+            {showForm ? '✕ 닫기' : '➕ 키워드 등록'}
+          </button>
         </div>
-      )}
 
-      <div style={{ display:'grid', gridTemplateColumns:`repeat(${Math.min(accounts.length, 2)}, 1fr)`, gap:16 }}>
-        {accounts.map((acc, i) => {
-          const ss = statusStyle(acc.status);
-          const cs = acc.ctrScore ? ctrScoreStyle(acc.ctrScore) : null;
-          return (
-            <div key={i} style={{ border:`2px solid ${acc.found ? (acc.isActive ? '#03c75a' : '#f87171') : '#e5e7eb'}`, borderRadius:12, overflow:'hidden' }}>
-              {/* 계정 헤더 */}
-              <div style={{ padding:'10px 16px', background: acc.found ? (acc.isActive ? '#f0fdf4' : '#fef2f2') : '#f9fafb', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                <span style={{ fontWeight:700, fontSize:14 }}>{acc.name}</span>
-                {acc.found ? (
-                  <span style={{ fontSize:11, fontWeight:700, padding:'2px 10px', borderRadius:20, background:ss.bg, color:ss.color }}>
-                    {acc.status}
-                  </span>
-                ) : (
-                  <span style={{ fontSize:11, fontWeight:700, padding:'2px 10px', borderRadius:20, background:'#f3f4f6', color:'#6b7280' }}>
-                    미등록
-                  </span>
-                )}
+        {/* 등록 폼 */}
+        {showForm && (
+          <form onSubmit={handleRegister} style={{ background:'#f8fafc', border:'1px solid #e5e7eb', borderRadius:10, padding:'16px', marginBottom:14 }}>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:12 }}>
+              <div>
+                <label style={{ fontSize:11, fontWeight:700, display:'block', marginBottom:4 }}>계정 선택</label>
+                <select value={formAccount} onChange={e => setFormAccount(e.target.value)}
+                  style={{ width:'100%', padding:'6px 10px', border:'1px solid var(--color-border)', borderRadius:6, fontSize:13, background:'#fff' }}>
+                  {accountNames.map(n => <option key={n} value={n}>{n}</option>)}
+                </select>
               </div>
-
-              {acc.found ? (
-                <div style={{ padding:'16px' }}>
-                  {/* 성과 지표 */}
-                  <div style={{ display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:10, marginBottom:14 }}>
-                    <AdMetric label="노출수"   value={acc.impCnt != null ? fmtN(acc.impCnt) : '-'} />
-                    <AdMetric label="클릭수"   value={acc.clkCnt != null ? fmtN(acc.clkCnt) : '-'} />
-                    <AdMetric label="내 CTR"   value={acc.ctr    != null ? `${acc.ctr}%` : '-'} highlight />
-                    <AdMetric label="평균CPC"  value={acc.avgCpc  != null ? `${Number(acc.avgCpc).toLocaleString()}원` : '-'} />
-                    <AdMetric label="광고비"   value={acc.salesAmt != null ? `${Number(acc.salesAmt).toLocaleString()}원` : '-'} />
-                    <AdMetric label="입찰가"   value={acc.bid      != null ? `${Number(acc.bid).toLocaleString()}원` : '-'} />
-                  </div>
-
-                  {/* 시장 대비 평가 */}
-                  {cs && (
-                    <div style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 12px', background:cs.bg, borderRadius:8 }}>
-                      <span style={{ fontSize:13, fontWeight:800, color:cs.color }}>{cs.label}</span>
-                      {acc.ctrDiff !== null && (
-                        <span style={{ fontSize:11, color:cs.color }}>
-                          시장 평균 대비 CTR {acc.ctrDiff > 0 ? '+' : ''}{acc.ctrDiff}%p
-                        </span>
-                      )}
-                    </div>
-                  )}
-                  {!cs && market && acc.ctr !== null && (
-                    <div style={{ fontSize:11, color:'var(--color-text-muted)', marginTop:6 }}>시장 평균 CTR 비교 불가 (데이터 없음)</div>
-                  )}
-                </div>
-              ) : (
-                <div style={{ padding:'24px 16px', textAlign:'center', color:'#9ca3af', fontSize:13 }}>
-                  이 계정에 해당 키워드 광고가 없습니다
-                  <br/><span style={{ fontSize:11 }}>네이버 검색광고에서 키워드를 등록하면 성과가 표시됩니다</span>
-                </div>
-              )}
+              <div>
+                <label style={{ fontSize:11, fontWeight:700, display:'block', marginBottom:4 }}>운영 상태</label>
+                <select value={formStatus} onChange={e => setFormStatus(e.target.value)}
+                  style={{ width:'100%', padding:'6px 10px', border:'1px solid var(--color-border)', borderRadius:6, fontSize:13, background:'#fff' }}>
+                  {STATUS_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={{ fontSize:11, fontWeight:700, display:'block', marginBottom:4 }}>입찰가 (원)</label>
+                <input type="number" value={formBid} onChange={e => setFormBid(e.target.value)} placeholder="예: 500"
+                  style={{ width:'100%', padding:'6px 10px', border:'1px solid var(--color-border)', borderRadius:6, fontSize:13 }} />
+              </div>
+              <div>
+                <label style={{ fontSize:11, fontWeight:700, display:'block', marginBottom:4 }}>메모</label>
+                <input type="text" value={formMemo} onChange={e => setFormMemo(e.target.value)} placeholder="선택 입력"
+                  style={{ width:'100%', padding:'6px 10px', border:'1px solid var(--color-border)', borderRadius:6, fontSize:13 }} />
+              </div>
             </div>
-          );
-        })}
+            <button type="submit" className="btn btn-primary" style={{ fontSize:12 }} disabled={saving}>
+              {saving ? '저장 중…' : '💾 저장'}
+            </button>
+          </form>
+        )}
+
+        {/* 등록된 계정 목록 */}
+        {myRows.length === 0 ? (
+          <div style={{ textAlign:'center', padding:'28px', color:'#9ca3af', fontSize:13, border:'2px dashed #e5e7eb', borderRadius:10 }}>
+            아직 등록된 운영 데이터가 없습니다
+            <br/><span style={{ fontSize:11 }}>위 [키워드 등록] 버튼으로 각 계정의 운영 현황을 기록해보세요</span>
+          </div>
+        ) : (
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(240px,1fr))', gap:12 }}>
+            {myRows.map((row, i) => {
+              const ss = statusStyle(row.status);
+              return (
+                <div key={row.id ?? i} style={{ border:`2px solid ${row.status==='운영중'?'#03c75a':'#e5e7eb'}`, borderRadius:12, overflow:'hidden' }}>
+                  {/* 계정 헤더 */}
+                  <div style={{ padding:'8px 14px', background: row.status==='운영중'?'#f0fdf4':'#f9fafb', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                    <span style={{ fontWeight:700, fontSize:13 }}>{row.account_name}</span>
+                    <div style={{ display:'flex', gap:6, alignItems:'center' }}>
+                      <span style={{ fontSize:11, fontWeight:700, padding:'2px 8px', borderRadius:20, background:ss.bg, color:ss.color }}>{row.status}</span>
+                      <button onClick={() => handleDelete(row.id)} style={{ fontSize:11, background:'none', border:'none', cursor:'pointer', color:'#9ca3af', padding:'0 2px' }}>🗑</button>
+                    </div>
+                  </div>
+                  {/* 수치 */}
+                  <div style={{ padding:'12px 14px', display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+                    <AdMetric label="입찰가" value={row.bid_amt != null ? `${Number(row.bid_amt).toLocaleString()}원` : '-'} />
+                    {market && (
+                      <AdMetric label="시장 PC CTR" value={market.marketPcCtr != null ? `${market.marketPcCtr}%` : '-'} highlight />
+                    )}
+                    {row.memo && (
+                      <div style={{ gridColumn:'1/-1', fontSize:11, color:'var(--color-text-sub)', marginTop:4 }}>
+                        💬 {row.memo}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
-      <p style={{ marginTop:16, fontSize:11, color:'var(--color-text-muted)', padding:'8px 12px', background:'#f8fafc', borderRadius:6 }}>
-        ℹ️ 노출·클릭·CTR은 최근 30일 기준 / 입찰가·상태는 현재 설정값
+      <p style={{ fontSize:11, color:'var(--color-text-muted)', padding:'8px 12px', background:'#f8fafc', borderRadius:6 }}>
+        ℹ️ 네이버 검색광고 캠페인 관리 API는 별도 신청 권한이 필요하여, 현재는 수동 등록 방식으로 운영 현황을 관리합니다.
       </p>
     </div>
   );
@@ -225,7 +273,7 @@ function MyAdPanel({ keyword }) {
 
 function AdStat({ label, value, color }) {
   return (
-    <div style={{ textAlign:'center', minWidth:80 }}>
+    <div style={{ textAlign:'center', minWidth:72 }}>
       <div style={{ fontSize:15, fontWeight:800, color }}>{value}</div>
       <div style={{ fontSize:10, color:'var(--color-text-sub)', marginTop:2 }}>{label}</div>
     </div>
@@ -234,8 +282,8 @@ function AdStat({ label, value, color }) {
 
 function AdMetric({ label, value, highlight }) {
   return (
-    <div style={{ textAlign:'center', padding:'8px 4px', background:'#f8fafc', borderRadius:8 }}>
-      <div style={{ fontSize:14, fontWeight:700, color: highlight ? 'var(--color-primary)' : 'var(--color-text)' }}>{value}</div>
+    <div style={{ textAlign:'center', padding:'7px 4px', background:'#f8fafc', borderRadius:8 }}>
+      <div style={{ fontSize:13, fontWeight:700, color: highlight ? 'var(--color-primary)' : 'var(--color-text)' }}>{value}</div>
       <div style={{ fontSize:10, color:'var(--color-text-sub)', marginTop:2 }}>{label}</div>
     </div>
   );
