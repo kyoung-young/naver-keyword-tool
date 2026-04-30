@@ -188,34 +188,52 @@ function DetailPanel({ keyword }) {
             )}
 
             {/* ── 트렌드 ── */}
-            {tab === 'trend' && (
-              <div>
-                {data.trendData?.length > 0 ? (
-                  <div>
-                    <p style={{ fontSize:12, color:'var(--color-text-sub)', marginBottom:16 }}>최근 12개월 검색 트렌드 (DataLab 상대 지수 기준)</p>
-                    <div style={{ display:'flex', alignItems:'flex-end', gap:4, height:120, borderBottom:'1px solid var(--color-border)', paddingBottom:4 }}>
-                      {data.trendData.map((d, i) => {
-                        const max = Math.max(...data.trendData.map(x => x.ratio), 1);
-                        const pct = (d.ratio / max) * 100;
-                        return (
-                          <div key={i} style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:4 }}>
-                            <div style={{ width:'100%', background:'var(--color-primary)', borderRadius:'3px 3px 0 0', height:`${pct}%`, minHeight:2, opacity:0.8 }} />
-                            <span style={{ fontSize:9, color:'#9ca3af', transform:'rotate(-45deg)', whiteSpace:'nowrap', transformOrigin:'top left' }}>
-                              {d.period?.slice(2,7)}
-                            </span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ) : (
-                  <p style={{ textAlign:'center', color:'var(--color-text-sub)', fontSize:13, padding:'24px 0' }}>
-                    트렌드 데이터 없음<br/>
-                    <span style={{ fontSize:11, color:'var(--color-text-muted)' }}>(검색량이 낮은 키워드는 DataLab에 데이터가 없을 수 있습니다)</span>
+            {tab === 'trend' && (() => {
+              const td = data.trendData ?? [];
+              // DataLab 임계값 미달 시 ratio=0 배열 반환 → 실제 데이터 있는지 확인
+              const hasRealData = td.length > 0 && td.some(d => (d.ratio ?? 0) > 0);
+              const maxRatio = hasRealData ? Math.max(...td.map(d => d.ratio ?? 0)) : 1;
+
+              return (
+                <div>
+                  <p style={{ fontSize:12, color:'var(--color-text-sub)', marginBottom:16 }}>
+                    최근 12개월 검색 트렌드 (DataLab 상대 지수 기준)
                   </p>
-                )}
-              </div>
-            )}
+                  {hasRealData ? (
+                    <>
+                      <div style={{ display:'flex', alignItems:'flex-end', gap:4, height:120, borderBottom:'1px solid var(--color-border)', paddingBottom:4 }}>
+                        {td.map((d, i) => {
+                          const pct = Math.max((d.ratio ?? 0) / maxRatio * 100, 0);
+                          return (
+                            <div key={i} style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:4 }}>
+                              <div style={{ width:'100%', background:'var(--color-primary)', borderRadius:'3px 3px 0 0', height:`${pct}%`, minHeight: pct > 0 ? 4 : 0, opacity:0.8 }} />
+                              <span style={{ fontSize:9, color:'#9ca3af', transform:'rotate(-45deg)', whiteSpace:'nowrap', transformOrigin:'top left' }}>
+                                {d.period?.slice(2,7)}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <div style={{ display:'flex', justifyContent:'space-between', marginTop:8, fontSize:10, color:'#9ca3af' }}>
+                        <span>{td[0]?.period?.slice(0,7)}</span>
+                        <span style={{ color:'var(--color-primary)', fontWeight:700 }}>
+                          최고 {maxRatio.toFixed(0)} / 현재 {(td[td.length-1]?.ratio ?? 0).toFixed(0)}
+                        </span>
+                        <span>{td[td.length-1]?.period?.slice(0,7)}</span>
+                      </div>
+                    </>
+                  ) : (
+                    <div style={{ textAlign:'center', padding:'32px 0' }}>
+                      <p style={{ fontSize:13, color:'var(--color-text-sub)' }}>📉 트렌드 데이터 없음</p>
+                      <p style={{ fontSize:11, color:'var(--color-text-muted)', marginTop:6 }}>
+                        DataLab은 월 검색량이 일정 임계값 이상인 키워드만 제공합니다.<br/>
+                        이 키워드는 검색량이 낮아 트렌드 데이터를 확인할 수 없습니다.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
 
             {/* ── 클릭 분석 ── */}
             {tab === 'click' && (
