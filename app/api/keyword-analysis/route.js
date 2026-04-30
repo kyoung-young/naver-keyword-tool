@@ -36,19 +36,26 @@ async function getPublishCount(keyword, channel, clientId, clientSecret) {
     const items = data.items ?? [];
 
     // 날짜 범위로 월간 발행량 추정
-    // ※ 블로그: pubDate  "Mon, 09 Jan 2023 15:30:00 +0900"
-    // ※ 카페:  postdate "20230109"  → new Date() Invalid Date 주의
+    // ※ 블로그 pubDate : "Mon, 09 Jan 2023 15:30:00 +0900"  → new Date() 바로 파싱 가능
+    // ※ 카페 postdate : "20230109" 또는 pubDate: "2023.01.09"  → 직접 변환 필요
+    const parseDate = (raw) => {
+      if (!raw) return NaN;
+      const s = String(raw).trim();
+      // YYYYMMDD
+      if (/^\d{8}$/.test(s))
+        return new Date(`${s.slice(0,4)}-${s.slice(4,6)}-${s.slice(6,8)}`).getTime();
+      // YYYY.MM.DD
+      if (/^\d{4}\.\d{2}\.\d{2}$/.test(s))
+        return new Date(s.replace(/\./g, '-')).getTime();
+      // YYYY-MM-DD 또는 RFC 2822 등 나머지
+      return new Date(s).getTime();
+    };
+
     const dated = items
       .map(i => {
-        // pubDate, postdate 모두 시도 — YYYYMMDD 형식이면 변환
         for (const field of [i.pubDate, i.postdate]) {
-          if (!field) continue;
-          let raw = String(field).trim();
-          if (/^\d{8}$/.test(raw)) {
-            raw = `${raw.slice(0,4)}-${raw.slice(4,6)}-${raw.slice(6,8)}`;
-          }
-          const t = new Date(raw).getTime();
-          if (!isNaN(t)) return t;
+          const t = parseDate(field);
+          if (!isNaN(t) && t > 0) return t;
         }
         return null;
       })
